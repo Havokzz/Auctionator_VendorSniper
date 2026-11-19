@@ -1,0 +1,7 @@
+# Local only, not part of the add-on: working notes and backups
+/PLAN.md
+/backups/
+
+# Build output (tools/package.py)
+/dist/
+*.zip

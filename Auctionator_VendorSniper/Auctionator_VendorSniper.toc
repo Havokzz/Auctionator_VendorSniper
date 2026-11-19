@@ -1,0 +1,30 @@
+## Interface: 16001
+## Title: Auctionator: Vendor Sniper & Crafting
+## Notes: Buys auctions listed below vendor or disenchant value, ranks your most profitable crafts, sells junk, buys merchant items in bulk, and adds disenchant values and alt item counts to tooltips. An unofficial companion add-on for Auctionator.
+## Version: 1.0.0
+## Author: Havokzz
+## X-License: All Rights Reserved
+## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## Dependencies: Auctionator
+## SavedVariables: VendorSniperDB
+## Category: Auctions
+
+Core.lua
+ItemData.lua
+Prices.lua
+Disenchant.lua
+Scan.lua
+Buy.lua
+AutoSell.lua
+MerchantBuy.lua
+Recipes.lua
+Crafting.lua
+Inventory.lua
+Tooltip.lua
+DisenchantClick.lua
+UI\Widgets.lua
+UI\DealsTab.lua
+UI\CraftingTab.lua
+UI\ProfessionsWindow.lua
+UI\Tabs.lua
+UI\Options.lua
