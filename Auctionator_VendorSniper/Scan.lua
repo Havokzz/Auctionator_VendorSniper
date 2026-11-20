@@ -24,6 +24,7 @@ local ItemData = VS.ItemData
 
 local LOAD_TIMEOUT = 60    -- seconds to wait for item data (vendor prices) before skipping the rest
 local STALL_TIMEOUT = 30   -- seconds without a new page before the scan is given up
+local NUDGE_AFTER = 4      -- seconds without a new page before the next page is asked for again
 local THROTTLE_RETRY = 0.25
 local SLICE_MS = 6         -- milliseconds of work per frame, so the game doesn't freeze
 local DEFAULT_EXPECTED = 5000
@@ -34,6 +35,8 @@ local state = Scan.IDLE
 local scanId = 0
 local startedAt = 0      -- GetTime() when the scan started
 local lastPageAt = 0     -- GetTime() of the last page of results
+local lastNudgeAt = 0    -- GetTime() the next page was last asked for again (see Nudge)
+local Nudge -- defined below
 local driver             -- "auctionator" when Auctionator pages through the results, "self" when we do
 local done, total = 0, 0 -- progress within the current step
 local hooked = false
@@ -106,12 +109,29 @@ end
 
 -- Starting a scan --------------------------------------------------------------------------------
 
+-- The events read while pages arrive.
+local SCAN_EVENTS = {
+  "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED",
+  "AUCTION_HOUSE_BROWSE_RESULTS_ADDED",
+  "ITEM_DATA_LOAD_RESULT",
+  "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
+  "AUCTION_HOUSE_SHOW_ERROR", -- DatabaseError came right before pages stopped, during purchases
+}
+
+local function ListenWhileScanning(on)
+  for _, event in ipairs(SCAN_EVENTS) do
+    if on then
+      VS.SafeRegister(events, event)
+    elseif events:IsEventRegistered(event) then
+      events:UnregisterEvent(event)
+    end
+  end
+end
+
 local function Stop(message, ...)
   scanId = scanId + 1
   live = nil
-  events:UnregisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
-  events:UnregisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_ADDED")
-  events:UnregisterEvent("ITEM_DATA_LOAD_RESULT")
+  ListenWhileScanning(false)
   SetState(Scan.IDLE)
   if message then
     VS.Print(message, ...)
@@ -122,10 +142,8 @@ local function BeginScanning(by, newDriver)
   scanId = scanId + 1
   local id = scanId
   driver = newDriver
-  startedAt, lastPageAt = GetTime(), GetTime()
-  events:RegisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
-  events:RegisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_ADDED")
-  events:RegisterEvent("ITEM_DATA_LOAD_RESULT")
+  startedAt, lastPageAt, lastNudgeAt = GetTime(), GetTime(), 0
+  ListenWhileScanning(true)
   live = NewScan()
   VS.deals, VS.dealsByItem, lastScan = {}, nil, nil
   VS.Fire("DEALS_CHANGED", true)
@@ -138,6 +156,9 @@ local function BeginScanning(by, newDriver)
     if GetTime() - lastPageAt >= STALL_TIMEOUT then
       Stop("scan stopped: the server sent nothing for %d seconds.", STALL_TIMEOUT)
       return
+    end
+    if GetTime() - lastPageAt >= NUDGE_AFTER and GetTime() - lastNudgeAt >= NUDGE_AFTER then
+      Nudge(id, "no page for " .. math.floor(GetTime() - lastPageAt) .. "s")
     end
     C_Timer.After(1, CheckStall)
   end
@@ -165,6 +186,20 @@ local function RequestMore(id)
     return
   end
   C_AuctionHouse.RequestMoreBrowseResults()
+end
+
+-- Asks for the next page again when none came for a while. Searches and purchases made during a scan share
+-- the game's small queue of auction house messages with the page requests; when the queue is full the game
+-- drops one (AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED), and if that was a page request nobody asks again:
+-- Auctionator only asks for the next page when the previous one arrives. When the page arrives, Auctionator
+-- reads it as usual and carries on paging.
+Nudge = function(id, why)
+  if id ~= scanId or state ~= Scan.SCANNING or done == 0 or HasFullResults() then
+    return -- no first page yet (that query is still queued), or nothing more to ask for
+  end
+  lastNudgeAt = GetTime()
+  VS.Debug("scan: asking for the next page again (%s)", why)
+  RequestMore(id)
 end
 
 -- Auctionator's frame is created the first time the auction house opens, so this is retried until it exists.
@@ -266,8 +301,14 @@ end
 -- An item's value is its vendor price, or its disenchant value when that option is on and it's higher.
 local function CheckItem(scan, itemID, minProfit)
   local value, via, sellPrice, maxStack = VS.Disenchant.DealValue(itemID, scan.priceOf)
+  local known = scan.deals[itemID]
   if not value then
-    return false
+    -- The item's data can leave the client's cache after the scan (it holds only so many items). Without
+    -- disenchant values only the vendor price is needed, and the deal kept that; otherwise wait for a load.
+    if not known or not known.sellPrice or VS.GetSetting("includeDisenchant") then
+      return false
+    end
+    value, via, sellPrice = known.sellPrice, "vendor", known.sellPrice
   end
   local item = scan.items[itemID]
   -- found sold out after this scan started: its results are older than that, so leave it out
@@ -275,7 +316,7 @@ local function CheckItem(scan, itemID, minProfit)
     scan.deals[itemID] = nil
     return true
   end
-  local deal = scan.deals[itemID]
+  local deal = known
   if not deal then
     deal = VS.dealsByItem and VS.dealsByItem[itemID] or { itemID = itemID }
     scan.deals[itemID] = deal
@@ -287,7 +328,9 @@ local function CheckItem(scan, itemID, minProfit)
   deal.quality = quality
   deal.icon = C_Item.GetItemIconByID(itemID)
   deal.sellPrice = sellPrice           -- what a vendor pays
-  deal.stackable = maxStack > 1
+  if maxStack then
+    deal.stackable = maxStack > 1
+  end
   if deal.price ~= item.price or deal.value ~= value then
     deal.buyUnits, deal.totalProfit = nil, nil -- from a check at another price or value: out of date
   end
@@ -378,9 +421,7 @@ end
 -- Every page has arrived: rebuild from the complete results, load the missing vendor prices, check all.
 local function ReadResults()
   local id = scanId
-  events:UnregisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
-  events:UnregisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_ADDED")
-  events:UnregisterEvent("ITEM_DATA_LOAD_RESULT")
+  ListenWhileScanning(false)
   local scan = NewScan()
   scan.deals = live and live.deals or {} -- keeps the deals shown so far, and their objects
   live = nil
@@ -446,15 +487,36 @@ VS.On("SETTINGS_CHANGED", function(key)
     end
     return
   end
-  local before = #VS.deals
+  local scan, before = lastScan, #VS.deals
   local minProfit = math.max(1, VS.GetSetting("minItemProfit"))
-  for _, itemID in ipairs(lastScan.order) do
-    CheckItem(lastScan, itemID, minProfit)
+  -- items whose data left the client's cache can't be checked yet: load them, then check them again
+  local unloaded = {}
+  for _, itemID in ipairs(scan.order) do
+    if not CheckItem(scan, itemID, minProfit) then
+      unloaded[#unloaded + 1] = itemID
+    end
   end
-  Publish(lastScan, true) -- the buy flow starts over from the best deal
-  if #VS.deals ~= before then
-    VS.Print("the list now has %d deal%s (was %d).", #VS.deals, #VS.deals == 1 and "" or "s", before)
+  Publish(scan, true) -- the buy flow starts over from the best deal
+  local function Report()
+    if #VS.deals ~= before then
+      VS.Print("the list now has %d deal%s (was %d).", #VS.deals, #VS.deals == 1 and "" or "s", before)
+    end
   end
+  if #unloaded == 0 then
+    Report()
+    return
+  end
+  ItemData.LoadMany(unloaded, LOAD_TIMEOUT, function(missing)
+    if scan ~= lastScan then
+      return -- a new scan replaced it
+    end
+    local current = math.max(1, VS.GetSetting("minItemProfit"))
+    for _, itemID in ipairs(unloaded) do
+      CheckItem(scan, itemID, current)
+    end
+    Publish(scan)
+    Report()
+  end)
 end)
 
 -- Events -----------------------------------------------------------------------------------------
@@ -491,6 +553,17 @@ events:SetScript("OnEvent", function(_, event, ...)
     elseif driver == "self" then
       RequestMore(scanId)
     end
+  elseif event == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" or event == "AUCTION_HOUSE_SHOW_ERROR" then
+    -- maybe the page request was dropped or failed: ask again shortly, unless a page arrives first
+    local id, droppedAt = scanId, GetTime()
+    local why = event == "AUCTION_HOUSE_SHOW_ERROR" and ("auction house error " .. tostring((...)))
+      or "a message was dropped"
+    VS.Debug("scan: %s", why)
+    C_Timer.After(0.5, function()
+      if lastPageAt < droppedAt then
+        Nudge(id, why)
+      end
+    end)
   elseif event == "ITEM_DATA_LOAD_RESULT" then
     local itemID = ...
     if live and live.waiting[itemID] and live.items[itemID]

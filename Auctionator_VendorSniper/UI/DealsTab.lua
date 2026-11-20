@@ -145,7 +145,9 @@ local function BuyButtonState()
     end
     return "Nothing to buy - Scan", true
   end
-  if state == Buy.IDLE then
+  if state == Buy.IDLE and not target and not Buy.Best() then
+    return "Not enough money for any deal", false
+  elseif state == Buy.IDLE then
     return "Start buying", true
   elseif state == Buy.SEARCHING then
     return ("Checking %s..."):format(name), false
@@ -359,12 +361,22 @@ function UI.CreateDealsTab(parent)
   sessionText:SetPoint("LEFT", skipButton, "RIGHT", 12, 0)
 
   -- updates
+  -- The deal being bought moves when its live check changes its profit (the list is sorted by it). If its
+  -- row was on screen, the list follows it, so a clicked row doesn't jump away from under the cursor.
   local function RefreshList()
-    local copy = {}
+    local _, target = Buy.GetState()
+    local followed = target and scrollBox.FindFrame and scrollBox:FindFrame(target) ~= nil
+    local copy, targetIndex = {}, nil
     for i, deal in ipairs(VS.deals) do
       copy[i] = deal
+      if deal == target then
+        targetIndex = i
+      end
     end
     scrollBox:SetDataProvider(CreateDataProvider(copy), ScrollBoxConstants.RetainScrollPosition)
+    if followed and targetIndex and not scrollBox:FindFrame(target) and scrollBox.ScrollToElementDataIndex then
+      scrollBox:ScrollToElementDataIndex(targetIndex, ScrollBoxConstants.AlignNearest or 0.5)
+    end
   end
 
   local function RefreshStatus()

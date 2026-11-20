@@ -216,6 +216,7 @@ loader:SetScript("OnEvent", function(self, _, name)
   end
   VendorSniperDB.minProfit, VendorSniperDB.lastOwnScan = nil, nil -- replaced in 0.2.0
   VendorSniperDB.auctionPrices, VendorSniperDB.vendorPrices = nil, nil -- briefly saved by 0.4.0, Auctionator has them
+  VendorSniperDB.log = nil -- a troubleshooting log saved by test builds before 1.0.2
   if not VS.HasAuctionator() then
     VS.Print("Auctionator's API was not found - prices and shared scans won't work.")
   end
