@@ -22,6 +22,15 @@ jobs:
         with:
           fetch-depth: 0 # the packager looks back through history for the previous tag
 
+      # Release notes = this version's section of CHANGELOG.md ("## 1.0.1" for tag v1.0.1), not the whole file.
+      # Falls back to the whole file if there's no section for this version.
+      - name: Release notes for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v heading="## $version" '$0 == heading { found = 1; next } /^## / { if (found) exit } found'             CHANGELOG.md > RELEASE_NOTES.md
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then cp CHANGELOG.md RELEASE_NOTES.md; fi
+          cat RELEASE_NOTES.md
+
       - uses: BigWigsMods/packager@v2
         with:
           # name files and uploads after the tag alone, without the default "-forever" suffix
