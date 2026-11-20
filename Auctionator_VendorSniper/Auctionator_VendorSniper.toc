@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Auctionator: Vendor Sniper & Crafting
 ## Notes: Buys auctions listed below vendor or disenchant value, ranks your most profitable crafts, sells junk, buys merchant items in bulk, and adds disenchant values and alt item counts to tooltips. An unofficial companion add-on for Auctionator.
-## Version: 1.0.1
+## Version: @project-version@
 ## Author: Havokzz
 ## X-License: All Rights Reserved
 ## X-Curse-Project-ID: 1816761
