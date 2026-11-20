@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.2
 
 - Vendor Deals: after an item sells out at its current price, the deal that takes its place in the list is selected, instead of following the same item as its price goes up.
 - Vendor Deals: purchases are no longer lost or miscounted when the auction house reports an error during a scan. Every confirmed purchase counts towards the session and is sold to a vendor when that option is on.
@@ -8,6 +8,8 @@
 - Vendor Deals: deals you can't afford are passed over, and the Buy button says when none are affordable.
 - Vendor Deals: clicking a deal that gets removed says why in chat, and the list keeps the selected row in view.
 - Turning off "Include disenchant value" after a scan now removes every disenchant-only deal.
+
+## 1.0.1
 
 - New options to turn off the disenchant value in tooltips and the profit numbers in the profession window.
 - The options page scrolls when its settings don't fit the window.
