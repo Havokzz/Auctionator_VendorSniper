@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- New options to turn off the disenchant value in tooltips and the profit numbers in the profession window.
+- The options page scrolls when its settings don't fit the window.
+
 ## 1.0.0
 
 First public release.

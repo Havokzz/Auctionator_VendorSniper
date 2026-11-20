@@ -23,6 +23,9 @@ local function Amount(material)
 end
 
 local function AddDisenchantLines(tooltip, link)
+  if VS.GetSetting("disenchantTooltip") == false then
+    return
+  end
   local value, materials, unpriced = VS.Disenchant.GetValue(link)
   if not value then
     return

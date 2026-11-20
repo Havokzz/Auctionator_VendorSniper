@@ -14,6 +14,8 @@ local DEFAULTS = {
   sellJunk = false,          -- sell grey items at every merchant
   merchantBulkBuy = true,    -- right-click a stackable merchant item to buy any amount
   itemCounts = true,         -- item tooltips show how many each of your characters has
+  disenchantTooltip = true,  -- gear tooltips show the disenchant value and materials
+  professionProfits = true,  -- profit or loss next to each recipe in the profession window
 }
 
 VS.session = { spent = 0, vendorValue = 0, purchases = 0 }

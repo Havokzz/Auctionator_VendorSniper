@@ -7,8 +7,21 @@ local UI = VS.UI
 
 local TITLE = "Auctionator: Vendor Sniper & Crafting"
 
-local panel = CreateFrame("Frame")
-panel:Hide()
+-- canvas is what the options window shows; it scrolls `panel`, which holds the controls, once they're
+-- taller than the window. The named frames are needed by Blizzard's scroll frame template.
+local canvas = CreateFrame("Frame")
+canvas:Hide()
+local scroll = CreateFrame("ScrollFrame", "AuctionatorVendorSniperOptionsScroll", canvas,
+  "UIPanelScrollFrameTemplate")
+scroll:SetPoint("TOPLEFT", 0, -4)
+scroll:SetPoint("BOTTOMRIGHT", -28, 4) -- room for the scroll bar, which sits just right of the frame
+local panel = CreateFrame("Frame", nil, scroll)
+panel:SetSize(600, 1)
+scroll:SetScrollChild(panel)
+scroll:SetScript("OnSizeChanged", function(_, width)
+  panel:SetWidth(width)
+end)
+
 local refreshers = {} -- functions that show each control's current value
 local y = -16         -- where the next control goes
 
@@ -127,10 +140,14 @@ Checkbox("merchantBulkBuy", "Right-click to buy any amount",
   "Right-clicking a stackable item at a merchant asks how many to buy, beyond one stack.")
 
 Header("Tooltips")
+Checkbox("disenchantTooltip", "Disenchant value",
+  "Gear tooltips show what disenchanting it is worth, with each material, its chance and its price.")
 Checkbox("itemCounts", "Item counts on your characters",
   "Item tooltips show how many each character has in bags, bank and mail, as of their last login.")
 
-Header("Disenchanting")
+Header("Professions")
+Checkbox("professionProfits", "Profit in the profession window",
+  "Each recipe shows its profit (green) or loss (red); enchants show what their materials cost.")
 Checkbox("altClickDisenchant", "Alt+click to disenchant",
   "Alt+click a bag item that can be disenchanted to disenchant it (needs Enchanting, not in combat).")
 
@@ -138,14 +155,16 @@ Header("Troubleshooting")
 Checkbox("debug", "Step-by-step trace in chat",
   "Prints what scanning, buying and Alt+click disenchanting do, to help find problems.")
 
+panel:SetHeight(16 - y) -- the scroll range: everything above plus a margin
+
 local function Refresh()
   for _, refresh in ipairs(refreshers) do
     refresh()
   end
 end
-panel:SetScript("OnShow", Refresh)
+canvas:SetScript("OnShow", Refresh)
 VS.On("SETTINGS_CHANGED", function()
-  if panel:IsShown() then
+  if canvas:IsVisible() then
     Refresh()
   end
 end)
@@ -154,7 +173,7 @@ end)
 
 local category
 if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-  category = Settings.RegisterCanvasLayoutCategory(panel, TITLE)
+  category = Settings.RegisterCanvasLayoutCategory(canvas, TITLE)
   Settings.RegisterAddOnCategory(category)
 end
 

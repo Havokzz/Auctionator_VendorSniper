@@ -2,7 +2,7 @@ local _, VS = ...
 
 -- Shows each recipe's profit (green) or loss (red) at the right edge of its row in Blizzard's profession
 -- window, with the same numbers as the Crafting tab. "?" means a price is missing. Recipes that make no
--- item (enchants) show what their materials cost instead, in grey.
+-- item (enchants) show what their materials cost instead, in grey. Setting: professionProfits.
 -- The window is Blizzard_Professions, loaded on demand, so the hook is installed the first time it opens.
 
 local Crafting, Recipes = VS.Crafting, VS.Recipes
@@ -105,7 +105,7 @@ local function Decorate(frame, elementData, extra)
   local node = elementData or (frame.GetElementData and frame:GetElementData())
   local data = node and node.GetData and node:GetData()
   local recipeInfo = data and data.recipeInfo
-  if not recipeInfo then
+  if not recipeInfo or VS.GetSetting("professionProfits") == false then
     if frame.vsProfit then
       frame.vsProfit:SetText("")
     end
@@ -176,3 +176,9 @@ VS.On("RECIPES_CHANGED", function()
 end)
 VS.On("CRAFTING_CHANGED", RefreshSoon)
 VS.On("SCAN_DONE", RefreshSoon)
+-- Turning it off clears our numbers at once; the full "Enchant ..." names come back as Blizzard redraws the rows.
+VS.On("SETTINGS_CHANGED", function(key)
+  if key == "professionProfits" then
+    RefreshAll()
+  end
+end)
