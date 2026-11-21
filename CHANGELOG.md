@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 - Buy any amount from merchants: the "how many" box starts at 1 instead of a full stack.
 - Update notice: when someone in your guild or group runs a newer version of the add-on, chat says it's available.
