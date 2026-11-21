@@ -283,9 +283,9 @@ function MerchantBuy.Open(index)
     popup:SetPoint("CENTER")
   end
   popup:Show()
-  -- start at one stack
-  local perPurchase = PerPurchase(index, link)
-  popup.amount:SetText(tostring(perPurchase))
+  -- start at one (one bundle for items sold several at a time)
+  local batch = select(3, ItemInfo(index)) or 1
+  popup.amount:SetText(tostring(batch))
   popup.amount:HighlightText()
   popup.amount:SetFocus()
   UpdatePopup()
