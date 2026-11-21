@@ -150,7 +150,7 @@ function UI.CreateCraftingTab(parent)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
     GameTooltip:SetText("Update prices")
     GameTooltip:AddLine("Scans the whole auction house (a few seconds, no cooldown) so Auctionator has today's"
-      .. " prices for every crafted item and reagent. Keep the auction house open until it reaches 60%.", 1, 1, 1, true)
+      .. " prices for every crafted item and reagent. Keep the auction house open until it reaches 95%.", 1, 1, 1, true)
     if VS.dealsScannedAt then
       GameTooltip:AddLine("Last scan: " .. UI.TimeAgo(time() - VS.dealsScannedAt), 0.6, 0.8, 1)
     end

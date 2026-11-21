@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Buy any amount from merchants: the "how many" box starts at 1 instead of a full stack.
+- Update notice: when someone in your guild or group runs a newer version of the add-on, chat says it's available.
+- Scan progress moves steadily from start to finish, instead of sitting at 58% for most of the scan and then jumping to the end. The auction house can be closed once it reaches 95%.
+
 ## 1.0.2
 
 - Vendor Deals: after an item sells out at its current price, the deal that takes its place in the list is selected, instead of following the same item as its price goes up.

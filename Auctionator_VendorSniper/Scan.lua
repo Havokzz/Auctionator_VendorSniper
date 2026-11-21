@@ -13,10 +13,11 @@ local _, VS = ...
 -- it's missing or errors, we page through the results ourselves. When Auctionator's own Full Scan button
 -- starts a summary scan, a hook notices and we read that one as well.
 --
--- Steps and their share of the progress bar:
---   scanning  0-60%    the server sends the items in pages of 500 (the auction house must stay open)
---   loading   60-90%   vendor prices of items the client hasn't cached yet
---   finding   90-100%  deals
+-- Steps and their share of the progress bar, roughly their share of the time (receiving takes most of a
+-- minute; the vendor prices mostly load while the pages arrive, so the rest takes about a second):
+--   scanning  0-95%    the server sends the items in pages of 500 (the auction house must stay open)
+--   loading   95-99%   vendor prices of items the client hasn't cached yet
+--   finding   99-100%  deals
 
 VS.Scan = {}
 local Scan = VS.Scan
@@ -27,7 +28,7 @@ local STALL_TIMEOUT = 30   -- seconds without a new page before the scan is give
 local NUDGE_AFTER = 4      -- seconds without a new page before the next page is asked for again
 local THROTTLE_RETRY = 0.25
 local SLICE_MS = 6         -- milliseconds of work per frame, so the game doesn't freeze
-local DEFAULT_EXPECTED = 5000
+local DEFAULT_EXPECTED = 20000 -- browse results a first scan expects (gear has one per item level and suffix)
 
 Scan.IDLE, Scan.SCANNING, Scan.LOADING, Scan.EVALUATING = "idle", "scanning", "loading", "evaluating"
 
@@ -77,11 +78,11 @@ function Scan.GetProgress()
   local step = total > 0 and math.min(1, done / total) or 0
   local overall = 0
   if state == Scan.SCANNING then
-    overall = 0.6 * math.min(step, 0.98) -- the item count is an estimate from the last scan
+    overall = 0.95 * math.min(step, 0.98) -- the result count is an estimate from the last scan
   elseif state == Scan.LOADING then
-    overall = 0.6 + 0.3 * step
+    overall = 0.95 + 0.04 * step
   elseif state == Scan.EVALUATING then
-    overall = 0.9 + 0.1 * step
+    overall = 0.99 + 0.01 * step
   end
   return state, overall, done, total, state == Scan.IDLE and 0 or GetTime() - startedAt
 end
@@ -147,8 +148,8 @@ local function BeginScanning(by, newDriver)
   live = NewScan()
   VS.deals, VS.dealsByItem, lastScan = {}, nil, nil
   VS.Fire("DEALS_CHANGED", true)
-  SetState(Scan.SCANNING, 0, VendorSniperDB.lastScanCount or DEFAULT_EXPECTED)
-  VS.Print("scan started%s. Keep the auction house open until it reaches 60%%.", by and (" by " .. by) or "")
+  SetState(Scan.SCANNING, 0, VendorSniperDB.lastScanResults or DEFAULT_EXPECTED)
+  VS.Print("scan started%s. Keep the auction house open until it reaches 95%%.", by and (" by " .. by) or "")
   local function CheckStall()
     if id ~= scanId or state ~= Scan.SCANNING then
       return
@@ -425,11 +426,13 @@ local function ReadResults()
   local scan = NewScan()
   scan.deals = live and live.deals or {} -- keeps the deals shown so far, and their objects
   live = nil
-  for _, result in ipairs(C_AuctionHouse.GetBrowseResults()) do
+  local results = C_AuctionHouse.GetBrowseResults()
+  for _, result in ipairs(results) do
     AddResult(scan, result)
   end
-  if #scan.order > 0 then
-    VendorSniperDB.lastScanCount = #scan.order
+  if #results > 0 then
+    -- the next scan's progress estimate: it counts browse results as they arrive, not items
+    VendorSniperDB.lastScanResults = #results
   end
   -- drop deals for items no longer in the results
   for itemID in pairs(scan.deals) do
