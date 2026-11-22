@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Vendor Deals: the session total beside the Buy button is no longer cut off. It shows on two lines, with the profit on its own line (red if it's a loss).
+
 ## 1.3.0
 
 - Stop a scan: while a scan runs, the Scan button (and Update prices on the Crafting tab) reads "Stop" and stops it. The deals found so far stay in the list. `/vsnipe stop` does the same.
