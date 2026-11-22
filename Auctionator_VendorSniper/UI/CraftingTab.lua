@@ -144,13 +144,14 @@ function UI.CreateCraftingTab(parent)
   local updateButton = UI.Button(panel, "Update prices", 130, 24)
   updateButton:SetPoint("TOPRIGHT", -8, -4)
   updateButton:SetScript("OnClick", function()
-    VS.Scan.Start()
+    VS.Scan.Toggle()
   end)
   updateButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
     GameTooltip:SetText("Update prices")
     GameTooltip:AddLine("Scans the whole auction house (a few seconds, no cooldown) so Auctionator has today's"
-      .. " prices for every crafted item and reagent. Keep the auction house open until it reaches 95%.", 1, 1, 1, true)
+      .. " prices for every crafted item and reagent. Keep the auction house open until it reaches 95%. Click"
+      .. " again while it runs to stop it.", 1, 1, 1, true)
     if VS.dealsScannedAt then
       GameTooltip:AddLine("Last scan: " .. UI.TimeAgo(time() - VS.dealsScannedAt), 0.6, 0.8, 1)
     end
@@ -165,8 +166,11 @@ function UI.CreateCraftingTab(parent)
   professionsText:SetPoint("RIGHT", updateButton, "LEFT", -10, 0)
 
   local function RefreshUpdateButton()
-    if VS.Scan.IsBusy() then
-      local _, overall = VS.Scan.GetProgress()
+    local _, overall = VS.Scan.GetProgress()
+    if VS.Scan.IsReceiving() then
+      updateButton:SetText(("Stop (%d%%)"):format(overall * 100))
+      updateButton:SetEnabled(true)
+    elseif VS.Scan.IsBusy() then
       updateButton:SetText(("Updating %d%%"):format(overall * 100))
       updateButton:SetEnabled(false)
     else

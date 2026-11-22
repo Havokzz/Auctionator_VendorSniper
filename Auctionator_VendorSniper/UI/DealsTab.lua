@@ -179,7 +179,10 @@ local function ScanStatusText()
   elseif state == Scan.EVALUATING then
     return ("Step 3/3: finding deals %s / %s items"):format(Number(done), Number(total))
   end
-  if VS.dealsScannedAt then
+  if VS.dealsScannedAt and VS.dealsStoppedAt then
+    return ("Scan stopped at %d%% %s: %d deals so far"):format(VS.dealsStoppedAt * 100,
+      UI.TimeAgo(time() - VS.dealsScannedAt), #VS.deals)
+  elseif VS.dealsScannedAt then
     return ("Last scan %s: %d deals"):format(UI.TimeAgo(time() - VS.dealsScannedAt), #VS.deals)
   end
   return "No scan yet"
@@ -253,7 +256,23 @@ function UI.CreateDealsTab(parent)
   local scanButton = UI.Button(panel, "Scan", 130, 24)
   scanButton:SetPoint("TOPLEFT", 58, -4)
   scanButton:SetScript("OnClick", function()
-    Scan.Start()
+    Scan.Toggle()
+  end)
+  scanButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+    if Scan.IsReceiving() then
+      GameTooltip:AddLine("Stop the scan")
+      GameTooltip:AddLine("The deals found so far stay in the list. Scan again for the rest.", 1, 1, 1, true)
+    else
+      GameTooltip:AddLine("Scan")
+      GameTooltip:AddLine("Scans the whole auction house for deals (no cooldown). Click again while it runs to stop"
+        .. " it.", 1, 1, 1, true)
+    end
+    GameTooltip:AddLine("Key bindings: Options > Keybindings > Vendor Sniper.", 0.6, 0.8, 1, true)
+    GameTooltip:Show()
+  end)
+  scanButton:SetScript("OnLeave", function()
+    GameTooltip:Hide()
   end)
   local scanStatus = UI.Text(panel, "GameFontNormal")
   scanStatus:SetPoint("LEFT", scanButton, "RIGHT", 10, 0)
@@ -444,6 +463,7 @@ function UI.CreateDealsTab(parent)
   skipButton:SetScript("OnClick", function()
     Buy.Skip()
   end)
+  UI.dealsButtons = { buy = buyButton, skip = skipButton } -- for the key bindings (UI/Bindings.lua)
   local sessionText = UI.Text(panel, "GameFontHighlightSmall", "RIGHT")
   sessionText:SetPoint("BOTTOMRIGHT", -8, 20)
   sessionText:SetPoint("LEFT", skipButton, "RIGHT", 12, 0)
@@ -470,7 +490,10 @@ function UI.CreateDealsTab(parent)
   local function RefreshStatus()
     scanStatus:SetText(ScanStatusText())
     local _, overall = Scan.GetProgress()
-    if Scan.IsBusy() then
+    if Scan.IsReceiving() then
+      scanButton:SetText(("Stop (%d%%)"):format(overall * 100))
+      scanButton:SetEnabled(true)
+    elseif Scan.IsBusy() then
       scanButton:SetText(("Scanning %d%%"):format(overall * 100))
       scanButton:SetEnabled(false)
     else

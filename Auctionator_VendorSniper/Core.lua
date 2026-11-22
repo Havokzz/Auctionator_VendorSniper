@@ -152,11 +152,13 @@ local function PrintHelp()
   print(("  /vsnipe maxrisk <percent>   - skip disenchant deals more likely than this to lose money, 100 = off (now %s)")
     :format(maxRisk < 100 and (maxRisk .. "%") or "off"))
   print("  /vsnipe scan                - scan the auction house (it must be open)")
+  print("  /vsnipe stop                - stop the scan; the deals found so far stay")
   print("  /vsnipe session             - what you bought this session")
   print("  /vsnipe clearsell           - forget which bought items are waiting to be sold to a vendor")
   print(("  /vsnipe altde               - Alt+click a bag item to disenchant it, on or off (now %s)")
     :format(VS.GetSetting("altClickDisenchant") and "on" or "off"))
   print("  /vsnipe debug               - turn the step-by-step trace in chat on or off")
+  print("  Key bindings for Buy, Skip and Scan/Stop: Options > Keybindings > Vendor Sniper.")
 end
 
 SLASH_VENDORSNIPER1 = "/vsnipe"
@@ -195,6 +197,10 @@ SlashCmdList.VENDORSNIPER = function(input)
     VS.Print("debug trace %s.", VendorSniperDB.debug and "on" or "off")
   elseif command == "scan" then
     VS.Scan.Start()
+  elseif command == "stop" then
+    if not VS.Scan.Stop() then
+      VS.Print(VS.Scan.IsBusy() and "the scan is almost done and can't be stopped now." or "no scan is running.")
+    end
   elseif command == "options" or command == "config" or command == "settings" then
     VS.OpenOptions()
   elseif command == "altde" then

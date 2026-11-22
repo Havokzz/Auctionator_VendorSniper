@@ -167,7 +167,7 @@ Gap(22)
 local subtitle = UI.Text(panel, "GameFontHighlightSmall")
 subtitle:SetPoint("TOPLEFT", 16, y)
 subtitle:SetText("An unofficial companion add-on for Auctionator. The Vendor Deals and Crafting tabs are in the"
-  .. " auction house window.")
+  .. " auction house window. Key bindings for Buy, Skip and Scan are under Keybindings > Vendor Sniper.")
 Gap(18)
 
 Header("Vendor Deals")

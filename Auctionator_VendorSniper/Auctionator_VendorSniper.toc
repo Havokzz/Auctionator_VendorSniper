@@ -30,3 +30,4 @@ UI\CraftingTab.lua
 UI\ProfessionsWindow.lua
 UI\Tabs.lua
 UI\Options.lua
+UI\Bindings.lua

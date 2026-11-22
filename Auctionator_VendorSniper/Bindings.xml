@@ -1,0 +1,11 @@
+<Bindings>
+  <Binding name="VENDORSNIPER_BUY" category="Vendor Sniper">
+    VendorSniper_KeyBuy()
+  </Binding>
+  <Binding name="VENDORSNIPER_SKIP" category="Vendor Sniper">
+    VendorSniper_KeySkip()
+  </Binding>
+  <Binding name="VENDORSNIPER_SCAN" category="Vendor Sniper">
+    VendorSniper_KeyScan()
+  </Binding>
+</Bindings>

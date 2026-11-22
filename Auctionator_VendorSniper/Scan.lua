@@ -49,6 +49,7 @@ local NewScan -- defined below
 
 VS.deals = {}
 VS.dealsScannedAt = nil
+VS.dealsStoppedAt = nil -- 0-1: how far the last scan got when it was stopped, nil if it finished
 
 local events = CreateFrame("Frame")
 
@@ -147,6 +148,7 @@ local function BeginScanning(by, newDriver)
   ListenWhileScanning(true)
   live = NewScan()
   VS.deals, VS.dealsByItem, lastScan = {}, nil, nil
+  VS.dealsStoppedAt = nil
   VS.Fire("DEALS_CHANGED", true)
   SetState(Scan.SCANNING, 0, VendorSniperDB.lastScanResults or DEFAULT_EXPECTED)
   VS.Print("scan started%s. Keep the auction house open until it reaches 95%%.", by and (" by " .. by) or "")
@@ -424,6 +426,7 @@ local function Evaluate(id, scan, missing)
     Publish(scan)
     lastScan = scan
     VS.dealsScannedAt = time()
+    VS.dealsStoppedAt = nil
     local seconds = GetTime() - startedAt
     SetState(Scan.IDLE)
     VS.Print("scan done in %ds: %d items on sale, %d of them below vendor price.", seconds, #order, #VS.deals)
@@ -478,6 +481,45 @@ function Scan.RemoveDeal(deal)
       VS.Fire("DEALS_CHANGED")
       return
     end
+  end
+end
+
+-- Stops a scan while its pages arrive (later steps take about a second and can't be stopped). The deals
+-- found so far stay: a material is a single result, so a material price that arrived is final, and one
+-- that didn't counts as unpriced, which only lowers a disenchant value. The Buy flow checks every deal live.
+function Scan.Stop()
+  if state ~= Scan.SCANNING then
+    return false
+  end
+  local _, overall = Scan.GetProgress()
+  local scan = live
+  if driver == "auctionator" then
+    -- Auctionator has no way to stop its scan. Without this flag it asks for no more pages: the one on its way
+    -- ends it, and Auctionator saves the prices it received. Its own status ("43%") is cleared.
+    local frame = AuctionatorScanFrame()
+    if frame and frame.doingFullScan then
+      frame.doingFullScan = false
+      pcall(function()
+        Auctionator.EventBus:Fire(frame, Auctionator.IncrementalScan.Events.ScanFailed)
+      end)
+    end
+  end
+  Stop()
+  if scan then
+    Publish(scan)
+    lastScan = scan
+  end
+  VS.dealsScannedAt, VS.dealsStoppedAt = time(), overall
+  VS.Print("scan stopped at %d%%: %d deal%s so far. Scan again for the rest.", overall * 100, #VS.deals,
+    #VS.deals == 1 and "" or "s")
+  VS.Fire("SCAN_CHANGED")
+  return true
+end
+
+-- The Scan button and key binding: starts a scan, or stops the one whose pages are arriving.
+function Scan.Toggle()
+  if not Scan.Stop() then
+    Scan.Start()
   end
 end
 
