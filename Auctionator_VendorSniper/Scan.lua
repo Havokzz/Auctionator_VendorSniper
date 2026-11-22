@@ -39,6 +39,8 @@ local lastPageAt = 0     -- GetTime() of the last page of results
 local lastNudgeAt = 0    -- GetTime() the next page was last asked for again (see Nudge)
 local Nudge -- defined below
 local driver             -- "auctionator" when Auctionator pages through the results, "self" when we do
+local awaitingQuery = false -- the scan's browse query hasn't gone out yet (see the SendBrowseQuery hook)
+local lastQuerySentAt = -1  -- GetTime() a browse query last went out
 local done, total = 0, 0 -- progress within the current step
 local hooked = false
 local loadBatch -- the vendor prices being loaded (ItemData batch)
@@ -140,10 +142,12 @@ local function Stop(message, ...)
   end
 end
 
-local function BeginScanning(by, newDriver)
+-- awaiting: the scan's query hasn't been sent yet, so the browse results until then are an older search's
+local function BeginScanning(by, newDriver, awaiting)
   scanId = scanId + 1
   local id = scanId
   driver = newDriver
+  awaitingQuery = awaiting
   startedAt, lastPageAt, lastNudgeAt = GetTime(), GetTime(), 0
   ListenWhileScanning(true)
   live = NewScan()
@@ -215,10 +219,19 @@ local function HookAuctionator()
   hooksecurefunc(frame, "InitiateScan", function(self)
     -- our own Start is already scanning by the time it calls this, so only Auctionator's button gets here
     if state == Scan.IDLE and self.doingFullScan then
-      BeginScanning("Auctionator", "auctionator")
+      -- Auctionator queues its query: unless it went out during this call, it's still waiting
+      BeginScanning("Auctionator", "auctionator", lastQuerySentAt ~= GetTime())
     end
   end)
 end
+
+-- Knowing when the scan's query actually goes out. Until then the browse results are the previous search's
+-- (a scan that was stopped, or a search of the user's), and the game sends them again whenever it refreshes
+-- their prices. Counted as the new scan's pages, a scan stopped at 93% would restart at 93%.
+hooksecurefunc(C_AuctionHouse, "SendBrowseQuery", function()
+  lastQuerySentAt = GetTime()
+  awaitingQuery = false
+end)
 
 function Scan.Start()
   if state ~= Scan.IDLE then
@@ -233,10 +246,10 @@ function Scan.Start()
   HookAuctionator()
   local frame = AuctionatorScanFrame()
   if frame and frame.doingFullScan then
-    BeginScanning("Auctionator", "auctionator") -- it's already paging; read the same results
+    BeginScanning("Auctionator", "auctionator", false) -- it's already paging; read the same results
     return
   end
-  BeginScanning(nil, frame and "auctionator" or "self")
+  BeginScanning(nil, frame and "auctionator" or "self", true)
   if not (frame and pcall(frame.InitiateScan, frame)) then
     driver = "self"
     SendOwnQuery(scanId)
@@ -589,8 +602,8 @@ events:SetScript("OnEvent", function(_, event, ...)
     HookAuctionator()
     C_Timer.After(0, HookAuctionator) -- in case Auctionator creates its frame after us
   elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" or event == "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then
-    if state ~= Scan.SCANNING then
-      return
+    if state ~= Scan.SCANNING or awaitingQuery then
+      return -- not scanning, or the results of the search before the scan's (see the SendBrowseQuery hook)
     end
     lastPageAt = GetTime()
     if event == "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then
