@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Vendor Deals: every deal is valued at the finished scan's prices. With "Include disenchant value" on, some rows kept a value from the first pages of the scan. Two items that disenchant into the same materials could show a different worth and risk.
+- Disenchant risk near 0% or 100% shows one decimal: a 0.5% risk reads 0.5% instead of 1%, and 99.5% instead of 100%.
+
 ## 1.2.0
 
 - Disenchant risk: most gear disenchants into dust most of the time, and the rarer essences and shards make up its average value. A deal can be profitable on average and still lose money on most single items. Vendor Deals now shows how often that happens.
