@@ -240,10 +240,12 @@ local function BuyButtonState()
   return "", false
 end
 
+-- Two lines, so large amounts fit beside the buttons.
 local function SessionText()
   local session = VS.session
-  return ("Session: %d bought, spent %s, profit |cff40ff40%s|r"):format(session.purchases,
-    VS.FormatMoney(session.spent), VS.FormatMoney(session.vendorValue - session.spent))
+  local profit = session.vendorValue - session.spent
+  return ("Session: %d bought, spent %s\nProfit: %s%s|r"):format(session.purchases, VS.FormatMoney(session.spent),
+    profit < 0 and RED or GREEN, VS.FormatMoney(profit))
 end
 
 -- The tab ----------------------------------------------------------------------------------------
@@ -464,9 +466,12 @@ function UI.CreateDealsTab(parent)
     Buy.Skip()
   end)
   UI.dealsButtons = { buy = buyButton, skip = skipButton } -- for the key bindings (UI/Bindings.lua)
+  -- as tall as the buttons, beside them: room for two lines (see SessionText)
   local sessionText = UI.Text(panel, "GameFontHighlightSmall", "RIGHT")
-  sessionText:SetPoint("BOTTOMRIGHT", -8, 20)
-  sessionText:SetPoint("LEFT", skipButton, "RIGHT", 12, 0)
+  sessionText:SetPoint("TOPLEFT", skipButton, "TOPRIGHT", 12, 0)
+  sessionText:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -8, 10)
+  sessionText:SetJustifyV("MIDDLE")
+  sessionText:SetWordWrap(true)
 
   -- updates
   -- The deal being bought moves when its live check changes its profit (the list is sorted by it). If its
