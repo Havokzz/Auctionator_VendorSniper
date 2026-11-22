@@ -6,9 +6,9 @@ An unofficial companion add-on for [Auctionator](https://www.curseforge.com/wow/
 
 ## Vendor Deals
 
-A new tab in the auction house that lists every auction selling for less than a vendor will pay for it.
+A new tab in the auction house that lists every auction selling for less than a vendor will pay for it, or less than its disenchant materials are worth, with the risk that a disenchant comes out at a loss.
 
-![The Vendor Deals tab after a scan, with the disenchant risk of each deal](media/screenshots/vendor-deals.png)
+![The Vendor Deals tab after a scan, with the disenchant risk of each deal](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/vendor-deals.png)
 
 - **Scan** runs a quick summary scan of the whole auction house. It's Auctionator's own scan, so Auctionator's prices update at the same time, and scans started from Auctionator's button fill this list too. Click it again to stop the scan; the deals found so far stay.
 - Deals are sorted by profit, with how much each item earns and the total for every unit on sale.
@@ -23,30 +23,30 @@ A new tab in the auction house that lists every auction selling for less than a 
 
 A second auction house tab listing your recipes by profit: material cost (from the auction house or a vendor, whichever is cheaper) against what the crafted item sells for.
 
-![The Crafting tab, recipes sorted by profit](media/screenshots/crafting-tab.png)
+![The Crafting tab, recipes sorted by profit](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/crafting-tab.png)
 
 - **Update prices** searches every product and material again.
 - Clicking a recipe searches the crafted item and its materials in Auctionator's Shopping tab.
 - Recipes are learned when you open a profession window.
 - In the profession window itself, every recipe shows its profit (green) or loss (red). Enchants show what their materials cost.
 
-![Profit and loss next to each recipe in the profession window](media/screenshots/profession-window.png)
+![Profit and loss next to each recipe in the profession window](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/profession-window.png)
 
-![Enchants show what their materials cost](media/screenshots/enchanting-costs.png)
+![Enchants show what their materials cost](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/enchanting-costs.png)
 
 ## Merchants
 
 - **Sell junk automatically**: grey items are sold as soon as you open a merchant (off by default).
 - **Buy any amount**: right-click a stackable item at a merchant to buy several stacks at once. The amount is capped by your money and bag space.
 
-![Buying any amount of thread from a merchant](media/screenshots/merchant-bulk-buy.png)
+![Buying any amount of thread from a merchant](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/merchant-bulk-buy.png)
 
 ## Tooltips
 
 - **Disenchant value** of gear, with each material, its chance and its auction price.
 - **Item counts on your characters**: how many each of your characters has in bags, bank and mail.
 
-![A gear tooltip with disenchant value and item counts](media/screenshots/tooltip.png)
+![A gear tooltip with disenchant value and item counts](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/tooltip.png)
 
 ## Disenchanting
 
@@ -56,7 +56,7 @@ Hold **Alt** and click a bag item to disenchant it (needs Enchanting).
 
 Everything can be changed in **Options > AddOns > Auctionator: Vendor Sniper & Crafting**, or with `/vsnipe options`. Type `/vsnipe` for the chat commands.
 
-![The options page](media/screenshots/options.png)
+![The options page](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/options.png)
 
 ---
 
