@@ -10,6 +10,7 @@ local DEFAULTS = {
   maxSpend = 0,      -- copper per session, 0 = no limit
   sellToVendor = false, -- mark purchases and sell them at the next merchant
   includeDisenchant = false, -- gear also counts as a deal when disenchanting it is worth more than the price
+  maxDisenchantRisk = 100,   -- percent: disenchant deals more likely to lose money aren't bought (100 = no limit)
   altClickDisenchant = true, -- Alt+click a bag item to disenchant it
   sellJunk = false,          -- sell grey items at every merchant
   merchantBulkBuy = true,    -- right-click a stackable merchant item to buy any amount
@@ -147,6 +148,9 @@ local function PrintHelp()
   local maxSpend = VS.GetSetting("maxSpend")
   print(("  /vsnipe maxspend <amount>   - stop buying after spending this much per session, 0 = off (now %s)")
     :format(maxSpend > 0 and VS.FormatMoney(maxSpend) or "off"))
+  local maxRisk = VS.GetSetting("maxDisenchantRisk")
+  print(("  /vsnipe maxrisk <percent>   - skip disenchant deals more likely than this to lose money, 100 = off (now %s)")
+    :format(maxRisk < 100 and (maxRisk .. "%") or "off"))
   print("  /vsnipe scan                - scan the auction house (it must be open)")
   print("  /vsnipe session             - what you bought this session")
   print("  /vsnipe clearsell           - forget which bought items are waiting to be sold to a vendor")
@@ -177,6 +181,15 @@ SlashCmdList.VENDORSNIPER = function(input)
     end
     VS.SetSetting("maxSpend", value)
     VS.Print("max spend per session: %s", value > 0 and VS.FormatMoney(value) or "off")
+  elseif command == "maxrisk" or command == "risk" then
+    local value = tonumber((rest:gsub("%%", "")))
+    if not value then
+      VS.Print("usage: /vsnipe maxrisk 50  (a percentage; 100 turns it off)")
+      return
+    end
+    value = math.max(0, math.min(100, math.floor(value + 0.5)))
+    VS.SetSetting("maxDisenchantRisk", value)
+    VS.Print("max disenchant risk: %s", value < 100 and (value .. "% chance of a loss per item") or "off")
   elseif command == "debug" then
     VendorSniperDB.debug = not VendorSniperDB.debug
     VS.Print("debug trace %s.", VendorSniperDB.debug and "on" or "off")

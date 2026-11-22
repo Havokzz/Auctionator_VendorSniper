@@ -111,6 +111,53 @@ local function MoneyField(setting, label, description, minimum)
   Gap(40)
 end
 
+-- A whole percentage from 0 to 100; saved on Enter or when leaving the box.
+local function PercentField(setting, label, description)
+  local text = UI.Text(panel, "GameFontHighlight")
+  text:SetPoint("TOPLEFT", 26, y - 4)
+  text:SetText(label)
+  local edit = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+  edit:SetSize(50, 20)
+  edit:SetPoint("LEFT", text, "RIGHT", 14, 0)
+  edit:SetAutoFocus(false)
+  edit:SetMaxLetters(4)
+  local sign = UI.Text(panel, "GameFontHighlight")
+  sign:SetPoint("LEFT", edit, "RIGHT", 4, 0)
+  sign:SetText("%")
+  Description(text, description)
+
+  local function Show()
+    edit:SetText(tostring(VS.GetSetting(setting)))
+    edit:SetCursorPosition(0)
+  end
+  local function Save()
+    local value = tonumber((edit:GetText():gsub("%%", "")))
+    if not value then
+      VS.Print("couldn't read \"%s\" as a percentage from 0 to 100.", edit:GetText())
+    else
+      value = math.max(0, math.min(100, math.floor(value + 0.5)))
+      if value ~= VS.GetSetting(setting) then
+        VS.SetSetting(setting, value)
+      end
+    end
+    Show()
+  end
+  edit:SetScript("OnEnterPressed", function(self)
+    self:ClearFocus()
+  end)
+  edit:SetScript("OnEditFocusLost", Save)
+  edit:SetScript("OnEscapePressed", function(self)
+    Show()
+    self:ClearFocus()
+  end)
+  refreshers[#refreshers + 1] = function()
+    if not edit:HasFocus() then
+      Show()
+    end
+  end
+  Gap(40)
+end
+
 -- Layout -------------------------------------------------------------------------------------------
 
 local title = UI.Text(panel, "GameFontNormalLarge")
@@ -130,6 +177,9 @@ MoneyField("maxSpend", "Max spend per session",
   "Buying stops after spending this much until you log out or reload. 0 = no limit.", 0)
 Checkbox("includeDisenchant", "Include disenchant value",
   "Gear also counts as a deal when disenchanting it is worth more than its price (shown as DE).")
+PercentField("maxDisenchantRisk", "Max disenchant risk",
+  "Disenchant deals more likely than this to lose money on one item aren't listed or bought (most gear gives"
+  .. " dust most of the time; essences and shards make up the average). 100% = no limit.")
 Checkbox("sellToVendor", "Sell bought items to vendors",
   "Items the Buy button buys are sold automatically at the next merchant. Gear bought to disenchant isn't.")
 

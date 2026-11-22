@@ -11,11 +11,72 @@ local ROW_HEIGHT = 20
 local COLUMNS = {
   { key = "totalProfit", header = "Total profit", width = 140, right = -8 },
   { key = "profit", header = "Profit per item", width = 110, right = -156 },
-  { key = "value", header = "Worth", width = 110, right = -274 },
-  { key = "price", header = "Cheapest", width = 110, right = -392 },
-  { key = "onSale", header = "On sale", width = 60, right = -510 },
+  { key = "risk", header = "Risk", width = 44, right = -274 },
+  { key = "value", header = "Worth", width = 110, right = -326 },
+  { key = "price", header = "Cheapest", width = 110, right = -444 },
+  { key = "onSale", header = "On sale", width = 60, right = -562 },
 }
-local NAME_RIGHT = -578
+local NAME_RIGHT = -630
+
+local GREY, GREEN, YELLOW, RED = "|cff808080", "|cff40ff40", "|cffffd100", "|cffff5050"
+
+-- Disenchant risk --------------------------------------------------------------------------------
+--
+-- A disenchant deal's risk is the chance that disenchanting one is worth less than its price (see
+-- Disenchant.GetOutcomes). Vendor deals have none: a vendor always pays the same.
+
+local LOW_RISK, HIGH_RISK = 0.20, 0.50
+
+local function Percent(chance)
+  if chance > 0 and chance < 0.005 then
+    return "<1%"
+  elseif chance < 1 and chance > 0.995 then
+    return ">99%"
+  end
+  return ("%d%%"):format(math.floor(chance * 100 + 0.5))
+end
+
+local function RiskText(chance)
+  local color = chance < LOW_RISK and GREEN or (chance <= HIGH_RISK and YELLOW or RED)
+  return color .. Percent(chance) .. "|r"
+end
+
+local function MaterialName(itemID)
+  local name = (C_Item.GetItemNameByID and C_Item.GetItemNameByID(itemID)) or C_Item.GetItemInfo(itemID)
+  return name or ("item " .. itemID)
+end
+
+-- The chance that buying all `units` of what one click buys loses money overall. Worked out once per
+-- deal, price and amount, since it adds up every combination of results.
+local function RiskForAll(deal)
+  local cost = deal.value * deal.buyUnits - deal.totalProfit
+  local key = deal.buyUnits .. ":" .. cost
+  if deal.riskForAllKey ~= key then
+    deal.riskForAllKey = key
+    deal.riskForAll = VS.Disenchant.LossChanceMany(deal.outcomes, deal.buyUnits, cost)
+  end
+  return deal.riskForAll
+end
+
+local function AddRiskLines(deal)
+  local outcomes = deal.outcomes
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine(("Disenchanting one bought for %s gives:"):format(VS.FormatMoney(deal.price)), 1, 0.82, 0)
+  for i = #outcomes, 1, -1 do -- best first
+    local outcome = outcomes[i]
+    local chance = outcome.chance * 100
+    local chanceText = chance >= 1 and ("%.4g%%"):format(chance) or ("%.1f%%"):format(chance)
+    GameTooltip:AddDoubleLine(("   %s  %d %s"):format(chanceText, outcome.amount, MaterialName(outcome.itemID)),
+      (outcome.value < deal.price and RED or GREEN) .. VS.FormatMoney(outcome.value) .. "|r", 0.8, 0.8, 0.8)
+  end
+  GameTooltip:AddLine("   (after the 5% auction house cut; green = more than you pay)", 0.6, 0.6, 0.6)
+  GameTooltip:AddDoubleLine("Chance of a loss on one", RiskText(deal.risk), 1, 1, 1)
+  if deal.buyUnits and deal.buyUnits > 1 and deal.totalProfit then
+    GameTooltip:AddDoubleLine(("Chance of a loss on all %d"):format(deal.buyUnits), RiskText(RiskForAll(deal)), 1, 1, 1)
+  end
+  GameTooltip:AddLine(("3 times in 4 one is worth at least %s; on average %s."):format(
+    VS.FormatMoney(VS.Disenchant.AtLeast(outcomes, 0.75)), VS.FormatMoney(deal.value)), 0.8, 0.8, 0.8, true)
+end
 
 -- Rows -------------------------------------------------------------------------------------------
 
@@ -69,6 +130,9 @@ local function BuildRow(row)
     else
       GameTooltip:AddLine("The total profit shows once the item has been checked (when it's next to buy).", 0.7, 0.7, 0.7)
     end
+    if self.deal.outcomes then
+      AddRiskLines(self.deal)
+    end
     GameTooltip:AddLine("Click to buy this one next.", 0.6, 0.8, 1)
     GameTooltip:Show()
   end)
@@ -93,6 +157,7 @@ local function InitRow(row, deal)
   row.price:SetText(VS.FormatMoney(deal.price))
   row.value:SetText(VS.FormatMoney(deal.value) .. (deal.via == "disenchant" and " |cffa335eeDE|r" or ""))
   row.profit:SetText("|cff40ff40" .. VS.FormatMoney(deal.profit) .. "|r")
+  row.risk:SetText(deal.risk and RiskText(deal.risk) or (GREY .. "-|r"))
   -- known once the item has been checked: what one click buys
   if deal.totalProfit then
     row.totalProfit:SetText(("|cff40ff40%s|r |cff808080(%d)|r"):format(VS.FormatMoney(deal.totalProfit), deal.buyUnits or 0))
@@ -157,7 +222,9 @@ local function BuyButtonState()
   elseif state == Buy.READY and offer.kind == "item" then
     local auction = offer.auctions[1]
     local count = auction.quantity > 1 and (auction.quantity .. "x ") or ""
-    return ("Buy %s%s for %s  (+%s)"):format(count, name, VS.FormatMoney(auction.price), VS.FormatMoney(auction.profit)), true
+    local risk = auction.risk and (", " .. Percent(auction.risk) .. " risk") or ""
+    return ("Buy %s%s for %s  (+%s%s)"):format(count, name, VS.FormatMoney(auction.price), VS.FormatMoney(auction.profit),
+      risk), true
   elseif state == Buy.READY then
     return ("Buy %dx %s for %s  (+%s)"):format(offer.quantity, name, VS.FormatMoney(offer.price),
       VS.FormatMoney(offer.value - offer.price)), true
@@ -243,6 +310,7 @@ function UI.CreateDealsTab(parent)
       .. " price." },
     { "Such deals show DE in the Worth column. You need Enchanting (or an enchanter) to turn them into"
       .. " materials, and the materials still have to be sold.", 0.7, 0.7, 0.7 },
+    { "The Risk column shows how often disenchanting one is worth less than its price.", 0.7, 0.7, 0.7 },
   }, sellLabel)
 
   local minProfitText = UI.Text(panel, "GameFontDisableSmall", "RIGHT")
@@ -297,6 +365,7 @@ function UI.CreateDealsTab(parent)
     GameTooltip:AddLine("Click to change it. Deals earning less per item than this aren't listed or bought.",
       1, 1, 1, true)
     GameTooltip:AddLine("Max spend per session: /vsnipe maxspend", 0.6, 0.8, 1, true)
+    GameTooltip:AddLine("Max disenchant risk: /vsnipe maxrisk", 0.6, 0.8, 1, true)
     GameTooltip:Show()
   end)
   minProfitButton:SetScript("OnLeave", function()
@@ -314,6 +383,26 @@ function UI.CreateDealsTab(parent)
     -- the list's scroll bar takes 20 px on the right
     header:SetPoint("TOPRIGHT", panel, "TOPRIGHT", column.right - 20, -60)
     header:SetText(column.header)
+    if column.key == "risk" then
+      local hover = CreateFrame("Frame", nil, panel)
+      hover:SetAllPoints(header)
+      hover:EnableMouse(true)
+      hover:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine("Disenchant risk")
+        GameTooltip:AddLine("The chance that disenchanting one item bought at the cheapest price gives materials"
+          .. " worth less than you paid. Most gear gives dust most of the time, and the rarer essences and shards"
+          .. " make up the average, so a profit on average can still be a loss most times.", 1, 1, 1, true)
+        GameTooltip:AddLine(("Green under %d%%, yellow up to %d%%, red above. Vendor deals have no risk (-)."):format(
+          LOW_RISK * 100, HIGH_RISK * 100), 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Buying several evens it out: hover a deal to see the risk for all of them. Set a"
+          .. " limit with /vsnipe maxrisk or in the options.", 0.6, 0.8, 1, true)
+        GameTooltip:Show()
+      end)
+      hover:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+      end)
+    end
   end
 
   -- list
@@ -402,9 +491,10 @@ function UI.CreateDealsTab(parent)
       end
       emptyText:Show()
     end
-    local maxSpend = VS.GetSetting("maxSpend")
-    minProfitText:SetText(("Min profit %s per item%s  (click to change)"):format(VS.FormatMoney(VS.GetSetting("minItemProfit")),
-      maxSpend > 0 and ("  |  max spend " .. VS.FormatMoney(maxSpend)) or ""))
+    local maxSpend, maxRisk = VS.GetSetting("maxSpend"), VS.GetSetting("maxDisenchantRisk")
+    minProfitText:SetText(("Min profit %s per item%s%s  (click to change)"):format(VS.FormatMoney(VS.GetSetting("minItemProfit")),
+      maxSpend > 0 and ("  |  max spend " .. VS.FormatMoney(maxSpend)) or "",
+      VS.GetSetting("includeDisenchant") and maxRisk < 100 and ("  |  max risk " .. maxRisk .. "%") or ""))
   end
 
   local function RefreshBuy()
@@ -414,10 +504,10 @@ function UI.CreateDealsTab(parent)
     local state, target = Buy.GetState()
     skipButton:SetEnabled(target ~= nil and state ~= Buy.PURCHASING)
     if target then
-      targetText:SetText(("Now: %s - cheapest %s, %s %s, profit %s per item"):format(
+      targetText:SetText(("Now: %s - cheapest %s, %s %s, profit %s per item%s"):format(
         target.link or target.name, VS.FormatMoney(target.price),
         target.via == "disenchant" and "disenchant value" or "vendor price", VS.FormatMoney(target.value),
-        VS.FormatMoney(target.profit)))
+        VS.FormatMoney(target.profit), target.risk and (", risk of a loss " .. RiskText(target.risk)) or ""))
     else
       targetText:SetText("")
     end

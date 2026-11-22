@@ -5,6 +5,7 @@ local _, VS = ...
 
 local LABEL_COLOR = NORMAL_FONT_COLOR
 local DETAIL = { r = 0.8, g = 0.8, b = 0.8 }
+local WARNING = ORANGE_FONT_COLOR or CreateColor(1, 0.5, 0.25)
 
 local function MaterialName(itemID)
   local name = (C_Item.GetItemNameByID and C_Item.GetItemNameByID(itemID)) or C_Item.GetItemInfo(itemID)
@@ -20,6 +21,26 @@ local function Amount(material)
     return tostring(material[2])
   end
   return ("%d-%d"):format(material[2], material[3])
+end
+
+-- What the most likely result is worth after the auction house cut, e.g. "Usually (75%)  46s - 1g15s".
+-- Orange when it's less than the average: the rarer results make up the value, so most disenchants are
+-- worth less than it says.
+local function AddUsualLine(tooltip, value, materials)
+  local main = materials[1] -- the most likely material comes first
+  local price = VS.Prices.Auction(main[1])
+  if not price or main[4] > 0.9 or #materials < 2 then
+    return
+  end
+  local cut = VS.Disenchant.AH_CUT
+  local low, high = price * main[2] * cut, price * main[3] * cut
+  local text = GetMoneyString(math.floor(low + 0.5), true)
+  if high > low then
+    text = text .. " - " .. GetMoneyString(math.floor(high + 0.5), true)
+  end
+  local color = high < value * cut and WARNING or WHITE_FONT_COLOR
+  tooltip:AddDoubleLine(("   Usually (%d%%), after the 5%% cut"):format(main[4] * 100), color:WrapTextInColorCode(text),
+    DETAIL.r, DETAIL.g, DETAIL.b)
 end
 
 local function AddDisenchantLines(tooltip, link)
@@ -44,6 +65,7 @@ local function AddDisenchantLines(tooltip, link)
       price and (GetMoneyString(price, true) .. " each") or "no price",
       DETAIL.r, DETAIL.g, DETAIL.b, DETAIL.r, DETAIL.g, DETAIL.b)
   end
+  AddUsualLine(tooltip, value, materials)
 end
 
 -- "Will be sold to a vendor" for items the Buy button bought with Sell to vendor on.

@@ -312,6 +312,15 @@ local function CheckItem(scan, itemID, minProfit)
     value, via, sellPrice = known.sellPrice, "vendor", known.sellPrice
   end
   local item = scan.items[itemID]
+  -- every possible disenchant result: gives the risk of a loss. Above the "Max disenchant risk" option, the
+  -- item counts at its vendor price instead.
+  local outcomes
+  if via == "disenchant" then
+    outcomes = VS.Disenchant.GetOutcomes(itemID, scan.priceOf)
+    if outcomes and VS.Disenchant.TooRisky(outcomes, item.price) then
+      value, via, outcomes = sellPrice, "vendor", nil
+    end
+  end
   -- found sold out after this scan started: its results are older than that, so leave it out
   if value - item.price < minProfit or (removedAt[itemID] or 0) >= scan.startedAt then
     scan.deals[itemID] = nil
@@ -339,6 +348,9 @@ local function CheckItem(scan, itemID, minProfit)
   deal.price = item.price              -- cheapest price per item
   deal.onSale = item.onSale            -- items on sale in all, at any price
   deal.profit = value - item.price     -- per item, at the cheapest price
+  deal.outcomes = outcomes             -- disenchant deals: every possible result (Disenchant.GetOutcomes)
+  deal.risk = outcomes and VS.Disenchant.LossChance(outcomes, item.price) or nil -- chance one is a loss
+  deal.riskForAllKey = nil             -- the list's tooltip works out the risk for all units again
   return true
 end
 
@@ -478,7 +490,7 @@ end
 -- A new minimum profit, or turning disenchant values on or off, applies to the list right away: every item
 -- of the last scan is checked again. While a scan runs, its final pass uses the new setting anyway.
 VS.On("SETTINGS_CHANGED", function(key)
-  if key ~= "minItemProfit" and key ~= "includeDisenchant" then
+  if key ~= "minItemProfit" and key ~= "includeDisenchant" and key ~= "maxDisenchantRisk" then
     return
   end
   if state ~= Scan.IDLE then

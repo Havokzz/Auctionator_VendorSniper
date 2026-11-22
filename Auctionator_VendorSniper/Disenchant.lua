@@ -141,6 +141,137 @@ function Disenchant.GetValue(item, priceOf)
 end
 
 local AH_CUT = 0.95 -- the materials are sold on the auction house, which keeps 5%
+Disenchant.AH_CUT = AH_CUT
+
+-- Risk ---------------------------------------------------------------------------------------------
+--
+-- One disenchant gives one material, in an amount from its range. The table only gives the range, so each
+-- amount in it counts as equally likely. That makes a short list of possible results with their chances:
+-- e.g. 2, 3, 4 or 5 dust at 18.75% each, 2 or 3 essences at 10% each, a shard at 5%. Its average is the
+-- disenchant value; how often a result is worth less than the price paid is the risk of a loss.
+
+-- Every possible result of disenchanting one item, cheapest first: list of { value (copper, after the
+-- auction house cut), chance (0-1), itemID, amount }, and whether some material had no price (its results
+-- count as 0). nil if it can't be disenchanted.
+function Disenchant.GetOutcomes(item, priceOf)
+  local materials = Disenchant.GetMaterials(item)
+  if not materials then
+    return nil
+  end
+  priceOf = priceOf or VS.Prices.Auction
+  local outcomes, unpriced = {}, false
+  for _, material in ipairs(materials) do
+    local price = priceOf(material[1])
+    unpriced = unpriced or not price
+    local amounts = material[3] - material[2] + 1
+    for amount = material[2], material[3] do
+      outcomes[#outcomes + 1] = { value = (price or 0) * amount * AH_CUT, chance = material[4] / amounts,
+        itemID = material[1], amount = amount }
+    end
+  end
+  table.sort(outcomes, function(a, b) return a.value < b.value end)
+  return outcomes, unpriced
+end
+
+-- Chance (0-1) that one disenchant is worth less than `price`.
+function Disenchant.LossChance(outcomes, price)
+  local chance = 0
+  for _, outcome in ipairs(outcomes) do
+    if outcome.value < price then
+      chance = chance + outcome.chance
+    end
+  end
+  return math.min(1, chance)
+end
+
+-- The value one disenchant reaches or beats with the given chance: AtLeast(outcomes, 0.75) is what you
+-- get or more 3 times in 4.
+function Disenchant.AtLeast(outcomes, chance)
+  local above = 1 -- chance of this result or a better one
+  local value = outcomes[1] and outcomes[1].value or 0
+  for _, outcome in ipairs(outcomes) do
+    if above + 1e-9 < chance then
+      break
+    end
+    value = outcome.value
+    above = above - outcome.chance
+  end
+  return value
+end
+
+-- Average and spread (standard deviation) of one disenchant.
+local function Moments(outcomes)
+  local mean, square = 0, 0
+  for _, outcome in ipairs(outcomes) do
+    mean = mean + outcome.value * outcome.chance
+    square = square + outcome.value * outcome.value * outcome.chance
+  end
+  return mean, math.sqrt(math.max(0, square - mean * mean))
+end
+
+-- Normal distribution: chance of a value below x standard deviations from the average.
+local function NormalBelow(x)
+  -- Abramowitz and Stegun 7.1.26, accurate to about 1e-7
+  local z = math.abs(x) / math.sqrt(2)
+  local t = 1 / (1 + 0.3275911 * z)
+  local erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592)
+    * t * math.exp(-z * z)
+  return x >= 0 and (1 + erf) / 2 or (1 - erf) / 2
+end
+
+local EXACT_UNITS = 30 -- up to this many disenchants the sum is worked out result by result
+local BUCKETS = 1000   -- totals closer together than 1/BUCKETS of the range are merged (keeping their average)
+
+-- Chance (0-1) that `units` disenchants together are worth less than `cost`, the total paid for them.
+-- Several disenchants even out: one is mostly dust, but ten rarely miss every essence and shard.
+function Disenchant.LossChanceMany(outcomes, units, cost)
+  if units <= 1 then
+    return Disenchant.LossChance(outcomes, cost)
+  end
+  if units > EXACT_UNITS then
+    local mean, spread = Moments(outcomes)
+    if spread == 0 then
+      return mean * units < cost and 1 or 0
+    end
+    return NormalBelow((cost - mean * units) / (spread * math.sqrt(units)))
+  end
+  -- the totals after each disenchant: bucket -> { chance, value (the bucket's average total) }
+  local width = math.max(1, outcomes[#outcomes].value * units / BUCKETS)
+  local totals = { [0] = { 1, 0 } }
+  for _ = 1, units do
+    local nextTotals = {}
+    for _, total in pairs(totals) do
+      for _, outcome in ipairs(outcomes) do
+        local chance = total[1] * outcome.chance
+        if chance > 0 then
+          local value = total[2] + outcome.value
+          local key = math.floor(value / width)
+          local bucket = nextTotals[key]
+          if bucket then
+            bucket[2] = (bucket[2] * bucket[1] + value * chance) / (bucket[1] + chance)
+            bucket[1] = bucket[1] + chance
+          else
+            nextTotals[key] = { chance, value }
+          end
+        end
+      end
+    end
+    totals = nextTotals
+  end
+  local loss = 0
+  for _, total in pairs(totals) do
+    if total[2] < cost then
+      loss = loss + total[1]
+    end
+  end
+  return math.min(1, loss)
+end
+
+-- True when the "Max disenchant risk" option rules out buying at `price` to disenchant.
+function Disenchant.TooRisky(outcomes, price)
+  local limit = VS.GetSetting("maxDisenchantRisk") or 100
+  return limit < 100 and Disenchant.LossChance(outcomes, price) * 100 > limit + 1e-6
+end
 
 -- What one unit of an item is worth to the sniper: value, how it's earned ("vendor" or "disenchant"),
 -- vendor sell price, max stack size. With the "Disenchant" option on, gear counts at its disenchant value

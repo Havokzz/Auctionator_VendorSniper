@@ -274,6 +274,9 @@ end
 local function UpdateTarget(price, units, totalProfit)
   if price then
     target.price, target.profit = price, target.value - price
+    if target.outcomes then
+      target.risk = VS.Disenchant.LossChance(target.outcomes, price)
+    end
   end
   target.buyUnits, target.totalProfit = units, totalProfit
   VS.Scan.UpdateDeal(target)
@@ -361,6 +364,7 @@ local function ReadItems(itemKey)
   local budget, minProfit = Budget(), MinProfit()
   local auctions, budgetLimited = {}, false
   local bidOnly, own = 0, 0 -- auctions below its value that can't be bought outright: bid only, or our own
+  local risky = 0 -- auctions below its value whose price is above the "Max disenchant risk" option
   for index = 1, count do
     local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, index)
     local cheap = result and (result.buyoutAmount or result.bidAmount or math.huge) < target.value
@@ -381,7 +385,13 @@ local function ReadItems(itemKey)
       -- row, and buying (PlaceBid) gets one of them
       local quantity = math.min(result.quantity or 1, maxStack or 1)
       local value = worth * quantity
-      if value - result.buyoutAmount >= minProfit * quantity then
+      -- disenchant deals: the chance this auction loses money, at its own price per item
+      local unitPrice = result.buyoutAmount / quantity
+      local risk = target.outcomes and VS.Disenchant.LossChance(target.outcomes, unitPrice) or nil
+      if risk and value - result.buyoutAmount >= minProfit * quantity
+        and VS.Disenchant.TooRisky(target.outcomes, unitPrice) then
+        risky = risky + 1
+      elseif value - result.buyoutAmount >= minProfit * quantity then
         if result.buyoutAmount > budget then
           budgetLimited = true
         else
@@ -392,14 +402,15 @@ local function ReadItems(itemKey)
             value = value,
             profit = value - result.buyoutAmount,
             via = via,
+            risk = risk,
             link = result.itemLink,
           }
         end
       end
     end
   end
-  VS.Debug("buy: %d auctions found, %d below vendor price, %d bid only, %d own%s", count, #auctions, bidOnly, own,
-    budgetLimited and ", some too expensive" or "")
+  VS.Debug("buy: %d auctions found, %d below vendor price, %d bid only, %d own, %d too risky%s", count, #auctions,
+    bidOnly, own, risky, budgetLimited and ", some too expensive" or "")
   if #auctions == 0 then
     if budgetLimited then
       OutOfBudget()
@@ -408,6 +419,9 @@ local function ReadItems(itemKey)
         bidOnly == 1 and "" or "s", bidOnly == 1 and "has" or "have"))
     elseif own > 0 then
       DealGone("the auctions below its value are your own")
+    elseif risky > 0 then
+      DealGone(("the auction%s left %s above your max disenchant risk (%d%%)"):format(risky == 1 and "" or "s",
+        risky == 1 and "is" or "are", VS.GetSetting("maxDisenchantRisk")))
     else
       DealGone()
     end
