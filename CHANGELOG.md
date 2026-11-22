@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- Disenchant risk: most gear disenchants into dust most of the time, and the rarer essences and shards make up its average value. A deal can be profitable on average and still lose money on most single items. Vendor Deals now shows how often that happens.
+  - A new **Risk** column shows the chance that disenchanting one item is worth less than you paid, in green, yellow or red. Vendor deals show no risk.
+  - Hovering a disenchant deal lists every possible result with its chance and value. It also shows the chance of a loss on one item and on all the units one click buys, since buying several evens out the luck.
+  - The Buy button shows the risk of the auction it's about to buy.
+  - New option **Max disenchant risk** (options page, or `/vsnipe maxrisk 50`): disenchant deals more likely than this to lose money aren't listed or bought. Off by default.
+- Gear tooltips show what the most likely disenchant result is worth after the auction house cut. It's in orange when that's below the average.
+
 ## 1.1.0
 
 - Buy any amount from merchants: the "how many" box starts at 1 instead of a full stack.
