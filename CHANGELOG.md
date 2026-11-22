@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- Stop a scan: while a scan runs, the Scan button (and Update prices on the Crafting tab) reads "Stop" and stops it. The deals found so far stay in the list. `/vsnipe stop` does the same.
+- Key bindings: a new **Vendor Sniper** section in the game's key bindings has keys to buy the current deal, skip it, and start or stop a scan.
+
 ## 1.2.1
 
 - Vendor Deals: every deal is valued at the finished scan's prices. With "Include disenchant value" on, some rows kept a value from the first pages of the scan. Two items that disenchant into the same materials could show a different worth and risk.
