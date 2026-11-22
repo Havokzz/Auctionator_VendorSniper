@@ -119,11 +119,20 @@ function Disenchant.GetMaterials(item)
   end
 end
 
+-- `item` is an item (ID, link) or a list of materials from GetMaterials. A list works when the item has
+-- left the client's cache: what an item disenchants into never changes, only the prices do.
+local function MaterialsOf(item)
+  if type(item) == "table" then
+    return item
+  end
+  return Disenchant.GetMaterials(item)
+end
+
 -- Expected auction house value of disenchanting one item: value, materials, and whether some material
 -- had no price (then value counts only the priced ones). nil if it can't be disenchanted.
 -- priceOf(itemID) prices the materials; by default Auctionator's last saved price.
 function Disenchant.GetValue(item, priceOf)
-  local materials = Disenchant.GetMaterials(item)
+  local materials = MaterialsOf(item)
   if not materials then
     return nil
   end
@@ -154,7 +163,7 @@ Disenchant.AH_CUT = AH_CUT
 -- auction house cut), chance (0-1), itemID, amount }, and whether some material had no price (its results
 -- count as 0). nil if it can't be disenchanted.
 function Disenchant.GetOutcomes(item, priceOf)
-  local materials = Disenchant.GetMaterials(item)
+  local materials = MaterialsOf(item)
   if not materials then
     return nil
   end
@@ -282,13 +291,19 @@ function Disenchant.DealValue(item, priceOf)
   if not sellPrice then
     return nil
   end
+  local value, via = Disenchant.WorthOf(sellPrice, item, priceOf)
+  return value, via, sellPrice, maxStack
+end
+
+-- The same from a known vendor sell price and the item (or its materials, see MaterialsOf): value, via.
+function Disenchant.WorthOf(sellPrice, item, priceOf)
   local value, via = sellPrice, "vendor"
-  if VS.GetSetting("includeDisenchant") then
+  if VS.GetSetting("includeDisenchant") and item then
     local disenchant = Disenchant.GetValue(item, priceOf)
     disenchant = disenchant and math.floor(disenchant * AH_CUT)
     if disenchant and disenchant > value then
       value, via = disenchant, "disenchant"
     end
   end
-  return value, via, sellPrice, maxStack
+  return value, via
 end

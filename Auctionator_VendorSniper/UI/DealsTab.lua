@@ -27,11 +27,10 @@ local GREY, GREEN, YELLOW, RED = "|cff808080", "|cff40ff40", "|cffffd100", "|cff
 
 local LOW_RISK, HIGH_RISK = 0.20, 0.50
 
+-- Whole percentages, except near 0 and 100: a 0.5% risk reads 0.5%, not 1%, and 99.5% not 100%.
 local function Percent(chance)
-  if chance > 0 and chance < 0.005 then
-    return "<1%"
-  elseif chance < 1 and chance > 0.995 then
-    return ">99%"
+  if (chance > 0 and chance < 0.0095) or (chance > 0.9905 and chance < 1) then
+    return ("%.1f%%"):format(chance * 100)
   end
   return ("%d%%"):format(math.floor(chance * 100 + 0.5))
 end

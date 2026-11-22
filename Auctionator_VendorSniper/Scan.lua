@@ -303,20 +303,23 @@ end
 local function CheckItem(scan, itemID, minProfit)
   local value, via, sellPrice, maxStack = VS.Disenchant.DealValue(itemID, scan.priceOf)
   local known = scan.deals[itemID]
+  local materials = VS.Disenchant.GetMaterials(itemID) or (known and known.materials)
   if not value then
-    -- The item's data can leave the client's cache after the scan (it holds only so many items). Without
-    -- disenchant values only the vendor price is needed, and the deal kept that; otherwise wait for a load.
-    if not known or not known.sellPrice or VS.GetSetting("includeDisenchant") then
+    -- The item's data can leave the client's cache during or after the scan (it holds only so many items).
+    -- Its vendor price and what it disenchants into never change, so a deal that kept them is valued again
+    -- at this scan's prices. (Keeping its old value would leave one priced from the first pages only.)
+    if not known or not known.sellPrice then
       return false
     end
-    value, via, sellPrice = known.sellPrice, "vendor", known.sellPrice
+    sellPrice = known.sellPrice
+    value, via = VS.Disenchant.WorthOf(sellPrice, materials, scan.priceOf)
   end
   local item = scan.items[itemID]
   -- every possible disenchant result: gives the risk of a loss. Above the "Max disenchant risk" option, the
   -- item counts at its vendor price instead.
   local outcomes
   if via == "disenchant" then
-    outcomes = VS.Disenchant.GetOutcomes(itemID, scan.priceOf)
+    outcomes = VS.Disenchant.GetOutcomes(materials, scan.priceOf)
     if outcomes and VS.Disenchant.TooRisky(outcomes, item.price) then
       value, via, outcomes = sellPrice, "vendor", nil
     end
@@ -338,6 +341,7 @@ local function CheckItem(scan, itemID, minProfit)
   deal.quality = quality
   deal.icon = C_Item.GetItemIconByID(itemID)
   deal.sellPrice = sellPrice           -- what a vendor pays
+  deal.materials = materials           -- what it disenchants into (Disenchant.GetMaterials), or nil
   if maxStack then
     deal.stackable = maxStack > 1
   end
