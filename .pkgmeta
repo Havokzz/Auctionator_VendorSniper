@@ -11,6 +11,8 @@ ignore:
   - CHANGELOG.md
   - media
   - tools
+  # still used as the release notes: the packager reads them from the repository, not from the zip
+  - RELEASE_NOTES.md
 
 # RELEASE_NOTES.md is made by the workflow from CHANGELOG.md: just the section for the version being released.
 manual-changelog:
