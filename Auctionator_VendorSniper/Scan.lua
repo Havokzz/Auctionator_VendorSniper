@@ -263,8 +263,21 @@ end
 -- results are checked again from scratch. Deal objects are kept per item ID across both passes, so the
 -- deal the Buy button is working on stays the same object.
 
+-- The orders the list can be in (the dealSort setting, picked in the Deals tab's Sort dropdown). Each gives
+-- a number per deal, biggest first; ties go by profit per item. The buy flow works down the list in this order.
+Scan.SORTS = {
+  profit = function(deal) return deal.profit end,
+  roi = function(deal) return deal.profit / math.max(1, deal.price) end, -- return: profit per copper spent
+  risk = function(deal) return -(deal.risk or 0) end,                     -- lowest first; vendor deals have none
+}
+
 local function SortDeals(deals)
+  local KeyOf = Scan.SORTS[VS.GetSetting("dealSort")] or Scan.SORTS.profit
   table.sort(deals, function(a, b)
+    local keyA, keyB = KeyOf(a), KeyOf(b)
+    if keyA ~= keyB then
+      return keyA > keyB
+    end
     if a.profit ~= b.profit then
       return a.profit > b.profit
     end
@@ -549,6 +562,11 @@ end
 -- A new minimum profit, or turning disenchant values on or off, applies to the list right away: every item
 -- of the last scan is checked again. While a scan runs, its final pass uses the new setting anyway.
 VS.On("SETTINGS_CHANGED", function(key)
+  if key == "dealSort" then
+    SortDeals(VS.deals)
+    VS.Fire("DEALS_CHANGED", true) -- the buy flow starts over from the new top deal
+    return
+  end
   if key ~= "minItemProfit" and key ~= "includeDisenchant" and key ~= "maxDisenchantRisk" then
     return
   end

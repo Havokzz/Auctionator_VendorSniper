@@ -92,7 +92,7 @@ end
 
 local Search -- defined below
 
--- The most profitable deal that isn't skipped.
+-- The first deal in the list (in its sort order, see Scan.SORTS) that isn't skipped.
 -- itemID -> what we could spend when its auctions turned out too expensive. Such a deal is passed over
 -- until there's more to spend, so the buy flow doesn't stall on a deal it can't afford.
 local tooExpensive = {}
@@ -102,7 +102,7 @@ local function Eligible(deal, budget)
     and not (tooExpensive[deal.itemID] and budget <= tooExpensive[deal.itemID])
 end
 
--- The most profitable deal that isn't skipped and that we can afford.
+-- The first deal in the list that isn't skipped and that we can afford.
 local function Best()
   local budget = Budget()
   for _, deal in ipairs(VS.deals) do
@@ -113,7 +113,7 @@ local function Best()
 end
 Buy.Best = Best
 
--- Where a deal is in the list (it's sorted by profit), or nil.
+-- Where a deal is in the list, or nil.
 local function Position(deal)
   for i, other in ipairs(VS.deals) do
     if other == deal then
@@ -122,7 +122,7 @@ local function Position(deal)
   end
 end
 
--- Moves on to the most profitable deal.
+-- Moves on to the first deal in the list (see Best).
 local function Next()
   target, offer, quote, pending = nil, nil, nil, nil
   picked = false

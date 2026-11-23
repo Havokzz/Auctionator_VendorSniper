@@ -11,6 +11,7 @@ local DEFAULTS = {
   sellToVendor = false, -- mark purchases and sell them at the next merchant
   includeDisenchant = false, -- gear also counts as a deal when disenchanting it is worth more than the price
   maxDisenchantRisk = 100,   -- percent: disenchant deals more likely to lose money aren't bought (100 = no limit)
+  dealSort = "profit",       -- the Vendor Deals list's order, picked in its Sort dropdown (Scan.SORTS)
   altClickDisenchant = true, -- Alt+click a bag item to disenchant it
   sellJunk = false,          -- sell grey items at every merchant
   merchantBulkBuy = true,    -- right-click a stackable merchant item to buy any amount

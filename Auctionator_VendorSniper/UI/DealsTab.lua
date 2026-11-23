@@ -18,6 +18,16 @@ local COLUMNS = {
 }
 local NAME_RIGHT = -630
 
+-- The orders the "Sort" dropdown offers (keys of Scan.SORTS). The buy flow works down the list in this order.
+local SORTS = {
+  { key = "profit", text = "Profit per item", tooltip = "Biggest profit per item first." },
+  { key = "roi", text = "Return on gold", tooltip = "Most profit for the gold spent first (profit divided by"
+    .. " price): a 2s item making 6c comes before a 20s item making 7c. Best when your gold, or your max spend,"
+    .. " runs out before the deals do." },
+  { key = "risk", text = "Lowest risk", tooltip = "Lowest disenchant risk first, then by profit per item."
+    .. " Vendor deals have no risk, so they come first." },
+}
+
 local GREY, GREEN, YELLOW, RED = "|cff808080", "|cff40ff40", "|cffffd100", "|cffff5050"
 
 -- Disenchant risk --------------------------------------------------------------------------------
@@ -324,74 +334,165 @@ function UI.CreateDealsTab(parent)
     { "/vsnipe clearsell forgets the marks.", 0.6, 0.8, 1 },
   })
   -- "Include disenchant value": gear also counts when disenchanting it is worth more than its price
-  Checkbox("Include disenchant value", "includeDisenchant", {
+  local _, disenchantLabel = Checkbox("Include disenchant value", "includeDisenchant", {
     { "Gear also counts as a deal when disenchanting it is worth more than its price. The profit is the"
       .. " expected value of the materials at Auctionator's prices, minus the 5% auction house cut, minus the"
       .. " price." },
     { "Such deals show DE in the Worth column. You need Enchanting (or an enchanter) to turn them into"
       .. " materials, and the materials still have to be sold.", 0.7, 0.7, 0.7 },
-    { "The Risk column shows how often disenchanting one is worth less than its price.", 0.7, 0.7, 0.7 },
+    { "The Risk column shows how often disenchanting one is worth less than its price. Max risk, on this"
+      .. " row, leaves out the riskiest.", 0.7, 0.7, 0.7 },
   }, sellLabel)
 
+  -- "Sort": the list's order, which is also the order the Buy button buys in
+  local sortLabel = UI.Text(panel, "GameFontNormalSmall")
+  sortLabel:SetPoint("LEFT", disenchantLabel, "RIGHT", 20, 0)
+  sortLabel:SetText("Sort:")
+  local sortDropdown = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
+  sortDropdown:SetWidth(130)
+  sortDropdown:SetPoint("LEFT", sortLabel, "RIGHT", 6, 0)
+  sortDropdown:SetupMenu(function(_, root)
+    for _, sort in ipairs(SORTS) do
+      local option = root:CreateRadio(sort.text, function()
+        return VS.GetSetting("dealSort") == sort.key
+      end, function()
+        if VS.GetSetting("dealSort") ~= sort.key then
+          VS.SetSetting("dealSort", sort.key)
+        end
+      end)
+      option:SetTooltip(function(tooltip)
+        GameTooltip_SetTitle(tooltip, sort.text)
+        GameTooltip_AddNormalLine(tooltip, sort.tooltip)
+        GameTooltip_AddInstructionLine(tooltip, "The Buy button buys in the list's order.")
+      end)
+    end
+  end)
+  VS.On("SETTINGS_CHANGED", function(key)
+    if key == "dealSort" then
+      sortDropdown:GenerateMenu() -- shows the new choice
+    end
+  end)
+
+  -- A text that turns into an edit box when clicked: type a value, Enter saves it, Escape cancels.
+  -- opts: font and hoverFont of the text, side ("LEFT" or "RIGHT": where the box lines up with the text),
+  -- label (beside the box), boxWidth, current() = the box's starting text, save(text) = true when it was
+  -- saved (false keeps the box open), tooltip(), called to fill the GameTooltip.
+  local function ClickToEdit(text, opts)
+    local edit = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+    edit:SetSize(opts.boxWidth, 20)
+    edit:SetAutoFocus(false)
+    edit:SetMaxLetters(16)
+    edit:Hide()
+    local label = UI.Text(panel, "GameFontNormalSmall", opts.side)
+    label:SetText(opts.label)
+    label:Hide()
+    if opts.side == "RIGHT" then
+      edit:SetPoint("RIGHT", text, "RIGHT", 0, 0)
+      label:SetPoint("RIGHT", edit, "LEFT", -8, 0)
+    else
+      label:SetPoint("LEFT", text, "LEFT", 0, 0)
+      edit:SetPoint("LEFT", label, "RIGHT", 12, 0) -- the box's border reaches 5 px left of it
+    end
+    local button = CreateFrame("Button", nil, panel)
+    button:SetAllPoints(text)
+    local control = { editing = false }
+    local function StopEditing()
+      control.editing = false
+      edit:ClearFocus()
+      edit:Hide()
+      label:Hide()
+      text:Show()
+    end
+    edit:SetScript("OnEnterPressed", function(self)
+      if opts.save(self:GetText()) then
+        StopEditing()
+      else
+        self:HighlightText()
+      end
+    end)
+    edit:SetScript("OnEscapePressed", StopEditing)
+    edit:SetScript("OnEditFocusLost", StopEditing)
+    button:SetScript("OnClick", function()
+      control.editing = true
+      text:Hide()
+      label:Show()
+      edit:SetText(opts.current())
+      edit:Show()
+      edit:SetFocus()
+      edit:HighlightText()
+    end)
+    button:SetScript("OnEnter", function(self)
+      text:SetFontObject(opts.hoverFont)
+      GameTooltip:SetOwner(self, opts.side == "RIGHT" and "ANCHOR_BOTTOMLEFT" or "ANCHOR_BOTTOMRIGHT")
+      opts.tooltip()
+      GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", function()
+      text:SetFontObject(opts.font)
+      GameTooltip:Hide()
+    end)
+    return control
+  end
+
+  -- minimum profit per item: type an amount (50c, 1s50c, 2g)
   local minProfitText = UI.Text(panel, "GameFontDisableSmall", "RIGHT")
   minProfitText:SetPoint("TOPRIGHT", -8, -36)
+  ClickToEdit(minProfitText, {
+    font = "GameFontDisableSmall", hoverFont = "GameFontHighlightSmall", side = "RIGHT", boxWidth = 90,
+    label = "Min profit per item (e.g. 50c, 1s50c):",
+    current = function()
+      return VS.MoneyInputText(VS.GetSetting("minItemProfit"))
+    end,
+    save = function(input)
+      local value = VS.ParseMoney(input)
+      if not value then
+        VS.Print("couldn't read \"%s\" as an amount. Examples: 50c, 1s50c, 2g.", input)
+        return false
+      end
+      VS.SetSetting("minItemProfit", math.max(1, value))
+      VS.Print("minimum profit per item: %s", VS.FormatMoney(math.max(1, value)))
+      return true
+    end,
+    tooltip = function()
+      GameTooltip:AddLine("Minimum profit per item")
+      GameTooltip:AddLine("Click to change it. Deals earning less per item than this aren't listed or bought.",
+        1, 1, 1, true)
+      GameTooltip:AddLine("Max spend per session: /vsnipe maxspend, or in the options. Buying stops after"
+        .. " spending this much until you log out or reload.", 0.6, 0.8, 1, true)
+    end,
+  })
 
-  -- clicking the min profit text edits it in place: type an amount (50c, 1s50c, 2g), Enter saves it
-  local minProfitEdit = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-  minProfitEdit:SetSize(90, 20)
-  minProfitEdit:SetPoint("RIGHT", minProfitText, "RIGHT", 0, 0)
-  minProfitEdit:SetAutoFocus(false)
-  minProfitEdit:SetMaxLetters(16)
-  minProfitEdit:Hide()
-  local minProfitLabel = UI.Text(panel, "GameFontNormalSmall", "RIGHT")
-  minProfitLabel:SetPoint("RIGHT", minProfitEdit, "LEFT", -8, 0)
-  minProfitLabel:SetText("Min profit per item (e.g. 50c, 1s50c):")
-  minProfitLabel:Hide()
-
-  local function StopEditing()
-    minProfitEdit:ClearFocus()
-    minProfitEdit:Hide()
-    minProfitLabel:Hide()
-    minProfitText:Show()
-  end
-  minProfitEdit:SetScript("OnEnterPressed", function(self)
-    local value = VS.ParseMoney(self:GetText())
-    if not value then
-      VS.Print("couldn't read \"%s\" as an amount. Examples: 50c, 1s50c, 2g.", self:GetText())
-      self:HighlightText()
-      return
-    end
-    VS.SetSetting("minItemProfit", math.max(1, value))
-    VS.Print("minimum profit per item: %s", VS.FormatMoney(math.max(1, value)))
-    StopEditing()
-  end)
-  minProfitEdit:SetScript("OnEscapePressed", StopEditing)
-  minProfitEdit:SetScript("OnEditFocusLost", StopEditing)
-
-  local minProfitButton = CreateFrame("Button", nil, panel)
-  minProfitButton:SetAllPoints(minProfitText)
-  minProfitButton:SetScript("OnClick", function()
-    minProfitText:Hide()
-    minProfitLabel:Show()
-    minProfitEdit:SetText(VS.MoneyInputText(VS.GetSetting("minItemProfit")))
-    minProfitEdit:Show()
-    minProfitEdit:SetFocus()
-    minProfitEdit:HighlightText()
-  end)
-  minProfitButton:SetScript("OnEnter", function(self)
-    minProfitText:SetFontObject("GameFontHighlightSmall")
-    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-    GameTooltip:AddLine("Minimum profit per item")
-    GameTooltip:AddLine("Click to change it. Deals earning less per item than this aren't listed or bought.",
-      1, 1, 1, true)
-    GameTooltip:AddLine("Max spend per session: /vsnipe maxspend", 0.6, 0.8, 1, true)
-    GameTooltip:AddLine("Max disenchant risk: /vsnipe maxrisk", 0.6, 0.8, 1, true)
-    GameTooltip:Show()
-  end)
-  minProfitButton:SetScript("OnLeave", function()
-    minProfitText:SetFontObject("GameFontDisableSmall")
-    GameTooltip:Hide()
-  end)
+  -- max disenchant risk, after the Sort dropdown: type a percentage
+  local maxRiskText = UI.Text(panel, "GameFontHighlightSmall")
+  maxRiskText:SetPoint("LEFT", sortDropdown, "RIGHT", 16, 0)
+  local maxRisk = ClickToEdit(maxRiskText, {
+    font = "GameFontHighlightSmall", hoverFont = "GameFontNormalSmall", side = "LEFT", boxWidth = 40,
+    label = "Max risk % (100 = off):",
+    current = function()
+      return tostring(VS.GetSetting("maxDisenchantRisk"))
+    end,
+    save = function(input)
+      local value = input:lower():find("off") and 100 or tonumber((input:gsub("%%", "")))
+      if not value then
+        VS.Print("couldn't read \"%s\" as a percentage. Examples: 30, 50%%, off.", input)
+        return false
+      end
+      value = math.max(0, math.min(100, math.floor(value + 0.5)))
+      VS.SetSetting("maxDisenchantRisk", value)
+      VS.Print("max disenchant risk: %s", value < 100 and (value .. "% chance of a loss per item") or "off")
+      return true
+    end,
+    tooltip = function()
+      GameTooltip:AddLine("Max disenchant risk")
+      GameTooltip:AddLine("Click to change it. Disenchant deals more likely than this to lose money on one item"
+        .. " (the Risk column) aren't listed or bought. 100% = off.", 1, 1, 1, true)
+      GameTooltip:AddLine("Most gear gives dust most of the time, and the rarer essences and shards make up the"
+        .. " average, so a deal that profits on average can still lose on most single items.", 0.8, 0.8, 0.8, true)
+      if not VS.GetSetting("includeDisenchant") then
+        GameTooltip:AddLine("Only applies while \"Include disenchant value\" is on.", 1, 0.5, 0.25, true)
+      end
+    end,
+  })
 
   -- column headers
   local headerName = UI.Text(panel, "GameFontNormalSmall")
@@ -416,7 +517,7 @@ function UI.CreateDealsTab(parent)
         GameTooltip:AddLine(("Green under %d%%, yellow up to %d%%, red above. Vendor deals have no risk (-)."):format(
           LOW_RISK * 100, HIGH_RISK * 100), 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("Buying several evens it out: hover a deal to see the risk for all of them. Set a"
-          .. " limit with /vsnipe maxrisk or in the options.", 0.6, 0.8, 1, true)
+          .. " limit with Max risk above the list.", 0.6, 0.8, 1, true)
         GameTooltip:Show()
       end)
       hover:SetScript("OnLeave", function()
@@ -474,8 +575,8 @@ function UI.CreateDealsTab(parent)
   sessionText:SetWordWrap(true)
 
   -- updates
-  -- The deal being bought moves when its live check changes its profit (the list is sorted by it). If its
-  -- row was on screen, the list follows it, so a clicked row doesn't jump away from under the cursor.
+  -- The deal being bought moves when its live check changes what the list is sorted by. If its row was on
+  -- screen, the list follows it, so a clicked row doesn't jump away from under the cursor.
   local function RefreshList()
     local _, target = Buy.GetState()
     local followed = target and scrollBox.FindFrame and scrollBox:FindFrame(target) ~= nil
@@ -518,10 +619,12 @@ function UI.CreateDealsTab(parent)
       end
       emptyText:Show()
     end
-    local maxSpend, maxRisk = VS.GetSetting("maxSpend"), VS.GetSetting("maxDisenchantRisk")
-    minProfitText:SetText(("Min profit %s per item%s%s  (click to change)"):format(VS.FormatMoney(VS.GetSetting("minItemProfit")),
-      maxSpend > 0 and ("  |  max spend " .. VS.FormatMoney(maxSpend)) or "",
-      VS.GetSetting("includeDisenchant") and maxRisk < 100 and ("  |  max risk " .. maxRisk .. "%") or ""))
+    local maxSpend, riskLimit = VS.GetSetting("maxSpend"), VS.GetSetting("maxDisenchantRisk")
+    -- short: the Sort dropdown and Max risk share the row
+    minProfitText:SetText(("Min profit: %s%s"):format(VS.FormatMoney(VS.GetSetting("minItemProfit")),
+      maxSpend > 0 and ("  |  Max spend: " .. VS.FormatMoney(maxSpend)) or ""))
+    maxRiskText:SetText(("Max risk: %d%%"):format(riskLimit))
+    maxRiskText:SetShown(not maxRisk.editing)
   end
 
   local function RefreshBuy()

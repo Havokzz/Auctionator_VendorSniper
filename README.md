@@ -11,10 +11,10 @@ A new tab in the auction house that lists every auction selling for less than a 
 ![The Vendor Deals tab after a scan, with the disenchant risk of each deal](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/vendor-deals.png)
 
 - **Scan** runs a quick summary scan of the whole auction house. It's Auctionator's own scan, so Auctionator's prices update at the same time, and scans started from Auctionator's button fill this list too. Click it again to stop the scan; the deals found so far stay.
-- Deals are sorted by profit, with how much each item earns and the total for every unit on sale.
+- Deals are sorted by profit per item, with how much each item earns and the total for every unit on sale. The **Sort** dropdown can put the best **return on gold** first instead (most profit for the gold spent), or the **lowest risk**.
 - **Buy** buys the selected deal. It checks the live price again first, so you never pay more than the item is worth. The game allows one purchase per click.
 - **Include disenchant value**: gear also counts as a deal when its disenchant materials are worth more than its price (shown as "DE").
-- **Disenchant risk**: most gear disenchants into dust most of the time, and the rarer essences and shards make up its average value. The **Risk** column shows how often disenchanting one item is worth less than you paid. Hover a deal to see every possible result and the risk when you buy several, which evens out the luck. Set a **max risk** to skip the gambles.
+- **Disenchant risk**: most gear disenchants into dust most of the time, and the rarer essences and shards make up its average value. The **Risk** column shows how often disenchanting one item is worth less than you paid. Hover a deal to see every possible result and the risk when you buy several, which evens out the luck. Set a **max risk** on the tab to skip the gambles.
 - **Sell to vendor**: what you buy is sold automatically the next time you talk to a merchant. Only the units you bought are sold, never copies you already had.
 - Set a minimum profit per item (click it on the tab) and an optional spending cap per session.
 - **Key bindings** for Buy, Skip and Scan/Stop, under **Options > Keybindings > Vendor Sniper**.
