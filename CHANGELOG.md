@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0
+
+- Vendor Deals: a **Sort** dropdown sets the list's order, which is also the order the Buy button buys in:
+  - **Profit per item**: biggest profit first (as before).
+  - **Return on gold**: the most profit for the gold spent first, so a 2s item making 6c comes before a 20s item making 7c. Best when your gold or your max spend runs out before the deals do.
+  - **Lowest risk**: vendor deals and the safest disenchant deals first.
+- Vendor Deals: **Max risk** is now on the tab, beside the Sort dropdown. Click it to change it.
+- A scan started right after stopping one no longer begins at the stopped scan's percentage and sits there. It starts from 0%.
+
 ## 1.3.1
 
 - Vendor Deals: the session total beside the Buy button is no longer cut off. It shows on two lines, with the profit on its own line (red if it's a loss).
