@@ -27,6 +27,7 @@ A second auction house tab listing your recipes by profit: material cost (from t
 
 - **Update prices** searches every product and material again.
 - Clicking a recipe searches the crafted item and its materials in Auctionator's Shopping tab.
+- Point at a recipe's **Sells for** or **Profit** to see how the profit adds up, including the auction house's 5% cut.
 - Recipes are learned when you open a profession window.
 - In the profession window itself, every recipe shows its profit (green) or loss (red). Enchants show what their materials cost.
 
