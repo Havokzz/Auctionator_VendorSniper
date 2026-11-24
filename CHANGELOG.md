@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Crafting: point at a recipe's **Sells for** or **Profit** to see how the profit adds up: the auction house price, the auction house's 5% cut, what you get, the reagents and the profit.
+
 ## 1.4.0
 
 - Vendor Deals: a **Sort** dropdown sets the list's order, which is also the order the Buy button buys in:
