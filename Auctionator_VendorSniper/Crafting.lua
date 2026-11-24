@@ -56,26 +56,29 @@ local function CraftableFromBags(recipe)
   return count or 0
 end
 
--- The best way to sell one crafted item: value, "AH" / "vendor" / "disenchant".
+-- The best way to sell one crafted item: value, "AH" / "vendor" / "disenchant", and the auction house
+-- price before the 5% cut (nil when it sells to a vendor, which takes no cut).
 local function BestSale(itemID)
-  local best, via = nil, nil
+  local best, via, listed = nil, nil, nil
   local auction = VS.Prices.Auction(itemID)
   if auction then
-    best, via = math.floor(auction * AH_CUT), "AH"
+    best, via, listed = math.floor(auction * AH_CUT), "AH", auction
   end
   local sellPrice = VS.ItemData.GetSellInfo(itemID)
   if sellPrice and sellPrice > 0 and (not best or sellPrice > best) then
-    best, via = sellPrice, "vendor"
+    best, via, listed = sellPrice, "vendor", nil
   end
   local disenchant = VS.Disenchant.GetValue(itemID)
   if disenchant and disenchant > 0 and (not best or disenchant * AH_CUT > best) then
-    best, via = math.floor(disenchant * AH_CUT), "disenchant"
+    best, via, listed = math.floor(disenchant * AH_CUT), "disenchant", disenchant
   end
-  return best, via
+  return best, via, listed
 end
 
 -- Cost, sale value and profit of one recipe: { recipeID, profession, name, icon, output, link, made, cost,
--- unpriced, revenue, via, profit, age, craftable, reagents = { {itemID, quantity, price, source} } }.
+-- unpriced, revenue, listed, via, profit, age, craftable, reagents = { {itemID, quantity, price, source} } }.
+-- listed is what everything one craft makes sells for on the auction house before the 5% cut (nil when
+-- it's sold to a vendor).
 -- profit is nil when a price is missing.
 function Crafting.Evaluate(recipeID, recipe, professionName)
   local cost, unpriced, reagents = 0, 0, {}
@@ -88,7 +91,7 @@ function Crafting.Evaluate(recipeID, recipe, professionName)
       unpriced = unpriced + 1
     end
   end
-  local sale, via = BestSale(recipe.output)
+  local sale, via, listed = BestSale(recipe.output)
   local revenue = sale and math.floor(sale * recipe.made) or nil
   local name, link, quality = C_Item.GetItemInfo(recipe.output)
   return {
@@ -103,6 +106,7 @@ function Crafting.Evaluate(recipeID, recipe, professionName)
     cost = cost,
     unpriced = unpriced,
     revenue = revenue,
+    listed = revenue and listed and math.floor(listed * recipe.made) or nil,
     via = via,
     profit = revenue and unpriced == 0 and (revenue - cost) or nil,
     age = via == "AH" and VS.Prices.AgeDays(recipe.output) or nil,

@@ -60,7 +60,70 @@ local function ShowRowTooltip(row)
   end
   GameTooltip:AddLine(" ")
   GameTooltip:AddLine("Click to search the crafted item and its reagents in Auctionator's Shopping tab.", 0.6, 0.8, 1)
+  GameTooltip:AddLine("Point at Sells for or Profit to see how the profit adds up.", 0.6, 0.8, 1)
   GameTooltip:Show()
+end
+
+-- Over the Sells for and Profit columns: how the profit adds up, with the auction house's 5% cut.
+local function ShowProfitTooltip(row)
+  local data = row.data
+  GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+  GameTooltip:SetText("Profit per craft")
+  if not data.revenue then
+    GameTooltip:AddLine("No auction or vendor price for the crafted item yet.", 1, 0.5, 0.5)
+    GameTooltip:Show()
+    return
+  end
+  local items = ""
+  if data.made ~= 1 then
+    items = (" (%s items)"):format(data.made == math.floor(data.made) and data.made or ("%.1f"):format(data.made))
+  end
+  if data.listed then
+    local label = data.via == "disenchant" and "Disenchanted, the materials sell for"
+      or "Sells on the auction house for"
+    GameTooltip:AddDoubleLine(label .. items, Money(data.listed), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Auction house cut (5%)", "-" .. Money(data.listed - data.revenue),
+      1, 1, 1, 1, 0.31, 0.31)
+    GameTooltip:AddDoubleLine("You get", Money(data.revenue), 1, 0.82, 0, 1, 1, 1)
+  else
+    GameTooltip:AddDoubleLine("Sells to a vendor for" .. items, Money(data.revenue), 1, 0.82, 0, 1, 1, 1)
+  end
+  GameTooltip:AddDoubleLine("Reagents", "-" .. Money(data.cost) .. (data.unpriced > 0 and " +?" or ""),
+    1, 1, 1, 1, 0.31, 0.31)
+  if data.profit then
+    GameTooltip:AddDoubleLine("Profit", (data.profit < 0 and "-" or "") .. Money(math.abs(data.profit)), 1, 0.82, 0,
+      data.profit >= 0 and 0.25 or 1, data.profit >= 0 and 1 or 0.31, data.profit >= 0 and 0.25 or 0.31)
+  else
+    GameTooltip:AddDoubleLine("Profit", "?", 1, 0.82, 0, 0.5, 0.5, 0.5)
+    GameTooltip:AddLine(("%d reagent%s no price yet."):format(data.unpriced, data.unpriced == 1 and " has" or "s have"),
+      1, 0.5, 0.5)
+  end
+  GameTooltip:AddLine(" ")
+  if data.listed then
+    GameTooltip:AddLine("The auction house keeps 5% of every sale, so the profit counts only what you get.",
+      0.6, 0.8, 1, true)
+  else
+    GameTooltip:AddLine("A vendor pays more for it than the auction house would after its 5% cut.", 0.6, 0.8, 1, true)
+  end
+  GameTooltip:Show()
+end
+
+-- Which tooltip the cursor's spot on the row calls for, shown only when that changes.
+local function UpdateRowTooltip(row)
+  if not row.data then
+    return
+  end
+  local left = row.revenue:GetLeft()
+  local x = GetCursorPosition() / row:GetEffectiveScale()
+  local kind = (left and x >= left) and "profit" or "item"
+  if kind ~= row.tooltipKind then
+    row.tooltipKind = kind
+    if kind == "profit" then
+      ShowProfitTooltip(row)
+    else
+      ShowRowTooltip(row)
+    end
+  end
 end
 
 local function BuildRow(row)
@@ -86,11 +149,13 @@ local function BuildRow(row)
     end
   end)
   row:SetScript("OnEnter", function(self)
-    if self.data then
-      ShowRowTooltip(self)
-    end
+    self.tooltipKind = nil
+    UpdateRowTooltip(self)
+    self:SetScript("OnUpdate", UpdateRowTooltip)
   end)
-  row:SetScript("OnLeave", function()
+  row:SetScript("OnLeave", function(self)
+    self:SetScript("OnUpdate", nil)
+    self.tooltipKind = nil
     GameTooltip:Hide()
   end)
 end
@@ -100,6 +165,7 @@ local function InitRow(row, data)
     BuildRow(row)
   end
   row.data = data
+  row.tooltipKind = nil -- a refresh under the cursor shows the new numbers
   row.icon:SetTexture(data.icon)
   row.name:SetText(data.link or data.name or ("item " .. data.output))
   row.profession:SetText(GREY .. data.profession .. "|r")
