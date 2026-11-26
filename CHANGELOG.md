@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- **Recipe profit before you learn it**: at a profession trainer, and on recipe items (Pattern:, Plans:, Recipe: and so on) in the auction house, your bags or a vendor, the tooltip shows the craft's profit, what it sells for and what its reagents cost. Enchanting formulas show what their materials cost. Open each profession window once so the add-on knows its recipes. Recipes you haven't learned don't appear on the Crafting tab.
+- **Merchant price** in item tooltips: what a merchant charges for the item, right under Auctionator's lines, and whether the auction house is cheaper. Auctionator's own Vendor line is what a merchant pays you. Shows for items you've seen at a merchant.
+- Both can be turned off in the options.
+
 ## 1.4.1
 
 - Crafting: point at a recipe's **Sells for** or **Profit** to see how the profit adds up: the auction house price, the auction house's 5% cut, what you get, the reagents and the profit.
