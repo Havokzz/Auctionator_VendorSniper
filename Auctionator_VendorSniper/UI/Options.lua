@@ -192,12 +192,19 @@ Checkbox("merchantBulkBuy", "Right-click to buy any amount",
 Header("Tooltips")
 Checkbox("disenchantTooltip", "Disenchant value",
   "Gear tooltips show what disenchanting it is worth, with each material, its chance and its price.")
+Checkbox("merchantPriceTooltip", "Merchant price",
+  "Items sold by merchants show what a merchant charges (Auctionator's Vendor line is what a merchant pays you),"
+  .. " and whether the auction house is cheaper.")
 Checkbox("itemCounts", "Item counts on your characters",
   "Item tooltips show how many each character has in bags, bank and mail, as of their last login.")
 
 Header("Professions")
 Checkbox("professionProfits", "Profit in the profession window",
   "Each recipe shows its profit (green) or loss (red); enchants show what their materials cost.")
+Checkbox("recipeTooltips", "Recipe profit before you learn it",
+  "Tooltips at the trainer and on recipe items (Pattern:, Plans:, Recipe: and so on) show what the craft"
+  .. " sells for, what its reagents cost and the profit. Open the profession window once so the addon"
+  .. " learns its recipes.")
 Checkbox("altClickDisenchant", "Alt+click to disenchant",
   "Alt+click a bag item that can be disenchanted to disenchant it (needs Enchanting, not in combat).")
 

@@ -5,6 +5,9 @@ local _, VS = ...
 -- character: VendorSniperDB.characters["Name-Realm"].professions[professionName] =
 --   { updated = time(), recipes = { [recipeID] = { name, icon, output, made, reagents = { {itemID, quantity} } } } }
 -- Recipes without an item to sell (most enchants) are left out.
+-- Recipes not learned yet are saved apart, in .unlearned[professionName] = { updated, recipes } (enchants
+-- included, with output nil), for the recipe profit in trainer and recipe item tooltips. The Crafting tab
+-- and the profession window only use learned ones.
 
 VS.Recipes = {}
 local Recipes = VS.Recipes
@@ -39,11 +42,12 @@ local function IsOwnWindow()
     or (C.IsNPCCrafting and C.IsNPCCrafting()))
 end
 
--- A recipe as saved (see the top of this file), read from the open profession window; nil if it isn't
--- learned, or makes no item (unless withoutItem is true: then such recipes, like enchants, have output nil).
-local function ReadRecipe(recipeID, withoutItem)
+-- A recipe as saved (see the top of this file), read from the open profession window; nil if it makes no
+-- item (unless withoutItem is true: then such recipes, like enchants, have output nil), or isn't learned
+-- (unless includeUnlearned is true).
+local function ReadRecipe(recipeID, withoutItem, includeUnlearned)
   local info = C.GetRecipeInfo(recipeID)
-  if not info or not info.learned or info.isDummyRecipe then
+  if not info or info.isDummyRecipe or not (info.learned or includeUnlearned) then
     return nil
   end
   local schematic = C.GetRecipeSchematic(recipeID, false)
@@ -66,6 +70,59 @@ Recipes.ReadRecipe = function(recipeID, withoutItem)
   return ReadRecipe(recipeID, withoutItem)
 end
 
+-- Calls fn(recipeID, recipe, professionName, learned) for every saved recipe of this character, learned
+-- or not, until it returns true.
+local function EachRecipe(fn)
+  local data = CharacterData(false)
+  if not data then
+    return
+  end
+  for _, group in ipairs({ { data.professions, true }, { data.unlearned, false } }) do
+    for professionName, profession in pairs(group[1] or {}) do
+      for recipeID, recipe in pairs(profession.recipes) do
+        if fn(recipeID, recipe, professionName, group[2]) then
+          return
+        end
+      end
+    end
+  end
+end
+
+-- A recipe by its ID (the spell a trainer teaches): recipe, professionName, learned. Saved recipes first,
+-- then the game's own data, which may answer while the profession window is closed.
+function Recipes.Find(recipeID)
+  local found, foundProfession, foundLearned
+  EachRecipe(function(id, recipe, professionName, learned)
+    if id == recipeID then
+      found, foundProfession, foundLearned = recipe, professionName, learned
+      return true
+    end
+  end)
+  if found or not (C and C.GetRecipeInfo) then
+    return found, foundProfession, foundLearned
+  end
+  local ok, recipe = pcall(ReadRecipe, recipeID, true, true)
+  if ok and recipe then
+    return recipe, nil, nil
+  end
+end
+
+-- A saved recipe by its name, e.g. "Runecloth Bag" for "Pattern: Runecloth Bag": recipeID, recipe,
+-- professionName, learned.
+function Recipes.FindByName(name)
+  name = name:lower()
+  local result
+  EachRecipe(function(recipeID, recipe, professionName, learned)
+    if recipe.name and recipe.name:lower() == name then
+      result = { recipeID, recipe, professionName, learned }
+      return true
+    end
+  end)
+  if result then
+    return result[1], result[2], result[3], result[4]
+  end
+end
+
 local function Capture()
   if not (C and C.GetAllRecipeIDs and C.GetBaseProfessionInfo) or not IsOwnWindow() then
     return
@@ -79,18 +136,31 @@ local function Capture()
   if not professionName or professionName == "" or not recipeIDs or #recipeIDs == 0 then
     return
   end
-  local recipes, count = {}, 0
+  local recipes, count, unlearned, unlearnedCount = {}, 0, {}, 0
   for _, recipeID in ipairs(recipeIDs) do
     local recipe = ReadRecipe(recipeID)
     if recipe then
       recipes[recipeID] = recipe
       count = count + 1
+    else
+      local info = C.GetRecipeInfo(recipeID)
+      recipe = info and not info.learned and ReadRecipe(recipeID, true, true)
+      if recipe then
+        unlearned[recipeID] = recipe
+        unlearnedCount = unlearnedCount + 1
+      end
     end
   end
-  if count == 0 then
+  if count == 0 and unlearnedCount == 0 then
     return -- the list isn't loaded yet; keep what was saved
   end
   local data = CharacterData(true)
+  data.unlearned = data.unlearned or {}
+  data.unlearned[professionName] = { updated = time(), recipes = unlearned }
+  VS.Debug("recipes: %s, %d not learned yet", professionName, unlearnedCount)
+  if count == 0 then
+    return -- nothing with an item to sell is learned (Enchanting); keep the Crafting tab as it was
+  end
   local previous = data.professions[professionName]
   local previousCount = 0
   for _ in pairs(previous and previous.recipes or {}) do

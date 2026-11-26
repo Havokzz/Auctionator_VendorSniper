@@ -17,7 +17,9 @@ local DEFAULTS = {
   merchantBulkBuy = true,    -- right-click a stackable merchant item to buy any amount
   itemCounts = true,         -- item tooltips show how many each of your characters has
   disenchantTooltip = true,  -- gear tooltips show the disenchant value and materials
+  merchantPriceTooltip = true, -- tooltips show what a merchant charges, and whether the auction house is cheaper
   professionProfits = true,  -- profit or loss next to each recipe in the profession window
+  recipeTooltips = true,     -- trainer and recipe item tooltips show a recipe's profit before it's learned
 }
 
 VS.session = { spent = 0, vendorValue = 0, purchases = 0 }

@@ -68,6 +68,59 @@ local function AddDisenchantLines(tooltip, link)
   AddUsualLine(tooltip, value, materials)
 end
 
+-- What a merchant charges for the item, when Auctionator has seen it at one (its "Vendor" line is what a
+-- merchant pays). Says which is cheaper to buy from: the merchant, or the auction house.
+local function AddMerchantPriceLine(tooltip, link)
+  if VS.GetSetting("merchantPriceTooltip") == false then
+    return
+  end
+  local itemID = C_Item.GetItemInfoInstant(link)
+  local merchant = itemID and VS.Prices.VendorBuy(itemID)
+  if not merchant or merchant <= 0 then
+    return
+  end
+  local auction = VS.Prices.Auction(itemID)
+  if auction and auction < merchant then
+    tooltip:AddDoubleLine("Merchant price", WHITE_FONT_COLOR:WrapTextInColorCode(GetMoneyString(merchant, true)),
+      LABEL_COLOR.r, LABEL_COLOR.g, LABEL_COLOR.b)
+    tooltip:AddDoubleLine("   Cheaper on the auction house", GetMoneyString(auction, true),
+      DETAIL.r, DETAIL.g, DETAIL.b, DETAIL.r, DETAIL.g, DETAIL.b)
+  else
+    tooltip:AddDoubleLine("Merchant price (cheapest)",
+      WHITE_FONT_COLOR:WrapTextInColorCode(GetMoneyString(merchant, true)), LABEL_COLOR.r, LABEL_COLOR.g,
+      LABEL_COLOR.b)
+  end
+end
+
+-- The merchant price goes right under Auctionator's Vendor and Auction lines, above other add-ons' lines
+-- (Price History & Trends adds its own after Auctionator's, and loads before us): it's added when
+-- Auctionator's tooltip function runs. merchantShown[tooltip] = { link, time } stops the item tooltip hook
+-- below from adding it again in the same frame; that hook adds it when Auctionator's function didn't run.
+local merchantShown = setmetatable({}, { __mode = "k" })
+
+local function OnAuctionatorTooltip(tooltip, link)
+  if not link or not tooltip or tooltip:IsForbidden() or not tooltip.AddDoubleLine then
+    return
+  end
+  local ok, err = pcall(AddMerchantPriceLine, tooltip, link)
+  if ok then
+    merchantShown[tooltip] = { link = link, time = GetTime() }
+  else
+    VS.Debug("tooltip error: %s", tostring(err))
+  end
+end
+
+if Auctionator and Auctionator.Tooltip and Auctionator.Tooltip.ShowTipWithPricing then
+  hooksecurefunc(Auctionator.Tooltip, "ShowTipWithPricing", OnAuctionatorTooltip)
+end
+
+local function ShownByAuctionator(tooltip, link)
+  local shown = merchantShown[tooltip]
+  merchantShown[tooltip] = nil
+  return shown ~= nil and shown.time == GetTime()
+    and C_Item.GetItemInfoInstant(shown.link) == C_Item.GetItemInfoInstant(link)
+end
+
 -- "Will be sold to a vendor" for items the Buy button bought with Sell to vendor on.
 local function AddSellLine(tooltip, link)
   local itemID = C_Item.GetItemInfoInstant(link)
@@ -77,6 +130,104 @@ local function AddSellLine(tooltip, link)
       VS.AutoSell.IsOn() and "" or " (Sell to vendor is off)"), 0.4, 0.8, 1)
   end
 end
+
+-- Recipe profit ----------------------------------------------------------------------------------
+-- At the trainer and on recipe items ("Pattern: Runecloth Bag"): what a craft sells for, what its
+-- reagents cost and the profit, from the recipes saved when the profession window was opened.
+
+local GREEN_TEXT, RED_TEXT = CreateColor(0.25, 1, 0.25), CreateColor(1, 0.31, 0.31)
+
+local VIA_TEXT = {
+  AH = "auction house, after the 5% cut",
+  vendor = "vendor",
+  disenchant = "disenchanted, after the 5% cut",
+}
+
+local function AddRecipeLines(tooltip, recipeID, recipe)
+  if not recipe.output then
+    -- enchants make no item: only what the materials cost
+    local cost, unpriced = 0, false
+    for _, reagent in ipairs(recipe.reagents) do
+      local price = VS.Prices.Cheapest(reagent.itemID)
+      cost = cost + (price or 0) * reagent.quantity
+      unpriced = unpriced or not price
+    end
+    if #recipe.reagents > 0 then
+      tooltip:AddDoubleLine("Materials cost", WHITE_FONT_COLOR:WrapTextInColorCode(
+        (cost > 0 and GetMoneyString(cost, true) or "?") .. (unpriced and cost > 0 and " +?" or "")),
+        LABEL_COLOR.r, LABEL_COLOR.g, LABEL_COLOR.b)
+    end
+    return
+  end
+  local row = VS.Crafting.Evaluate(recipeID, recipe)
+  local profitText = "?"
+  if row.profit then
+    local color = row.profit >= 0 and GREEN_TEXT or RED_TEXT
+    profitText = color:WrapTextInColorCode((row.profit >= 0 and "+" or "-")
+      .. GetMoneyString(math.abs(row.profit), true))
+  end
+  tooltip:AddDoubleLine("Crafting profit", profitText, LABEL_COLOR.r, LABEL_COLOR.g, LABEL_COLOR.b)
+  local items = ""
+  if row.made ~= 1 then
+    items = (row.made == math.floor(row.made) and row.made or ("%.1f"):format(row.made)) .. " items, "
+  end
+  tooltip:AddDoubleLine(("   Sells for (%s%s)"):format(items, row.via and VIA_TEXT[row.via] or "no price"),
+    row.revenue and GetMoneyString(row.revenue, true) or "?",
+    DETAIL.r, DETAIL.g, DETAIL.b, DETAIL.r, DETAIL.g, DETAIL.b)
+  tooltip:AddDoubleLine("   Reagents", (row.cost > 0 and GetMoneyString(row.cost, true) or "?")
+    .. (row.unpriced > 0 and row.cost > 0 and " +?" or ""), DETAIL.r, DETAIL.g, DETAIL.b, DETAIL.r, DETAIL.g, DETAIL.b)
+end
+
+-- Recipe items: the recipe they teach is the name after "Pattern: ", "Plans: ", "Recipe: " and so on.
+local function AddRecipeItemLines(tooltip, link)
+  if VS.GetSetting("recipeTooltips") == false then
+    return
+  end
+  local itemID, _, _, _, _, classID = C_Item.GetItemInfoInstant(link)
+  if not itemID or classID ~= Enum.ItemClass.Recipe then
+    return
+  end
+  local name = (C_Item.GetItemNameByID and C_Item.GetItemNameByID(itemID)) or C_Item.GetItemInfo(link)
+  local taught = name and name:match("^.-:%s*(.+)$")
+  local recipeID, recipe = VS.Recipes.FindByName(taught or name or "")
+  if recipe then
+    AddRecipeLines(tooltip, recipeID, recipe)
+  end
+end
+
+-- The trainer's tooltip for a service: its ID is the recipe's (a recipe is the spell the trainer teaches).
+local function OnAnyTooltip(tooltip, data)
+  if VS.GetSetting("recipeTooltips") == false or tooltip:IsForbidden() or not tooltip.GetProcessingTooltipInfo then
+    return
+  end
+  local info = tooltip:GetProcessingTooltipInfo()
+  if not info or info.getterName ~= "GetTrainerService" then
+    return
+  end
+  local ok, err = pcall(function()
+    local recipe, recipeID
+    if data and data.id then
+      recipeID = data.id
+      recipe = VS.Recipes.Find(recipeID)
+    end
+    local index = info.getterArgs and info.getterArgs[1]
+    if not recipe and index then
+      recipeID, recipe = VS.Recipes.FindByName(GetTrainerServiceInfo(index) or "")
+    end
+    if recipe then
+      AddRecipeLines(tooltip, recipeID, recipe)
+    end
+  end)
+  if not ok then
+    VS.Debug("trainer tooltip error: %s", tostring(err))
+  end
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AllTypes then
+  TooltipDataProcessor.AddTooltipPostCall(TooltipDataProcessor.AllTypes, OnAnyTooltip)
+end
+
+-- Item tooltips ----------------------------------------------------------------------------------
 
 local function ShouldHandle(tooltip)
   if tooltip == GameTooltip or tooltip == ItemRefTooltip then
@@ -97,7 +248,18 @@ local function OnItemTooltip(tooltip)
     link = select(2, tooltip:GetItem())
   end
   if link then
-    local ok, err = pcall(AddDisenchantLines, tooltip, link)
+    local ok, err = true, nil
+    if not ShownByAuctionator(tooltip, link) then
+      ok, err = pcall(AddMerchantPriceLine, tooltip, link)
+      if not ok then
+        VS.Debug("tooltip error: %s", tostring(err))
+      end
+    end
+    ok, err = pcall(AddDisenchantLines, tooltip, link)
+    if not ok then
+      VS.Debug("tooltip error: %s", tostring(err))
+    end
+    ok, err = pcall(AddRecipeItemLines, tooltip, link)
     if not ok then
       VS.Debug("tooltip error: %s", tostring(err))
     end
