@@ -46,6 +46,8 @@ A second auction house tab listing your recipes by profit: material cost (from t
 
 - **Disenchant value** of gear, with each material, its chance and its auction price.
 - **Item counts on your characters**: how many each of your characters has in bags, bank and mail.
+- **Merchant price**: what a merchant charges for the item, and whether the auction house is cheaper. Auctionator's own Vendor line is what a merchant pays you. Shows for items you've seen at a merchant.
+- **Recipe profit before you learn it**: at a profession trainer, and on recipe items (Pattern:, Plans:, Recipe: and so on) in the auction house, the tooltip shows the craft's profit, what it sells for and what its reagents cost, so you know before you buy or learn it. Open each profession window once so the add-on knows its recipes.
 
 ![A gear tooltip with disenchant value and item counts](https://raw.githubusercontent.com/Havokzz/Auctionator_VendorSniper/main/media/screenshots/tooltip.png)
 
