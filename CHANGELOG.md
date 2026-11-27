@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- The Vendor Deals and Crafting tabs no longer sit underneath another add-on's auction house tab. When the auction house opens and another tab is in their place, they move to its right.
+
 ## 1.5.0
 
 - **Recipe profit before you learn it**: at a profession trainer, and on recipe items (Pattern:, Plans:, Recipe: and so on) in the auction house, your bags or a vendor, the tooltip shows the craft's profit, what it sells for and what its reagents cost. Enchanting formulas show what their materials cost. Open each profession window once so the add-on knows its recipes. Recipes you haven't learned don't appear on the Crafting tab.
