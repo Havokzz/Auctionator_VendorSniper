@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2
+
+- Recipe items (Pattern:, Plans:, Recipe: and so on) now show the craft's profit, what it sells for and what its reagents cost, as 1.5.0 meant them to. The lines sit right under Auctionator's.
+- Recipe items find the recipe on any of your characters, so you can check a pattern for your tailor while shopping on another character. The profit line names that character, and says when they already know the recipe.
+
 ## 1.5.1
 
 - The Vendor Deals and Crafting tabs no longer sit underneath another add-on's auction house tab. When the auction house opens and another tab is in their place, they move to its right.
