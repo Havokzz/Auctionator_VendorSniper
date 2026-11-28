@@ -70,18 +70,29 @@ Recipes.ReadRecipe = function(recipeID, withoutItem)
   return ReadRecipe(recipeID, withoutItem)
 end
 
--- Calls fn(recipeID, recipe, professionName, learned) for every saved recipe of this character, learned
--- or not, until it returns true.
-local function EachRecipe(fn)
-  local data = CharacterData(false)
-  if not data then
-    return
+-- Calls fn(recipeID, recipe, professionName, learned, characterKey) for every saved recipe of this
+-- character, learned or not, until it returns true. With allCharacters, your other characters' recipes
+-- follow this character's.
+local function EachRecipe(fn, allCharacters)
+  local me = Recipes.CharacterKey()
+  local keys = { me }
+  if allCharacters then
+    for key in pairs(VendorSniperDB.characters or {}) do
+      if key ~= me then
+        keys[#keys + 1] = key
+      end
+    end
   end
-  for _, group in ipairs({ { data.professions, true }, { data.unlearned, false } }) do
-    for professionName, profession in pairs(group[1] or {}) do
-      for recipeID, recipe in pairs(profession.recipes) do
-        if fn(recipeID, recipe, professionName, group[2]) then
-          return
+  for _, key in ipairs(keys) do
+    local data = VendorSniperDB.characters and VendorSniperDB.characters[key]
+    if type(data) == "table" then
+      for _, group in ipairs({ { data.professions, true }, { data.unlearned, false } }) do
+        for professionName, profession in pairs(group[1] or {}) do
+          for recipeID, recipe in pairs(profession.recipes or {}) do
+            if fn(recipeID, recipe, professionName, group[2], key) then
+              return
+            end
+          end
         end
       end
     end
@@ -108,18 +119,19 @@ function Recipes.Find(recipeID)
 end
 
 -- A saved recipe by its name, e.g. "Runecloth Bag" for "Pattern: Runecloth Bag": recipeID, recipe,
--- professionName, learned.
-function Recipes.FindByName(name)
+-- professionName, learned, characterKey. With allCharacters, your other characters' recipes are searched
+-- after this character's (a recipe item bought on one character is often for another).
+function Recipes.FindByName(name, allCharacters)
   name = name:lower()
   local result
-  EachRecipe(function(recipeID, recipe, professionName, learned)
+  EachRecipe(function(recipeID, recipe, professionName, learned, key)
     if recipe.name and recipe.name:lower() == name then
-      result = { recipeID, recipe, professionName, learned }
+      result = { recipeID, recipe, professionName, learned, key }
       return true
     end
-  end)
+  end, allCharacters)
   if result then
-    return result[1], result[2], result[3], result[4]
+    return result[1], result[2], result[3], result[4], result[5]
   end
 end
 

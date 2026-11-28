@@ -79,7 +79,8 @@ local function BagSlot(owner)
   return bag, slot
 end
 
--- The bag slot of a tooltip showing an item that can be disenchanted by Alt+click. If not: nil, and why.
+-- The bag slot of a tooltip showing an item that can be disenchanted by Alt+click. If not: nil, why, and
+-- true when the reason points at a problem (the usual reasons aren't worth a debug line on every tooltip).
 local function Target(owner, link)
   if not link then
     return nil, "no item link"
@@ -99,7 +100,7 @@ local function Target(owner, link)
   local slotItemID = C_Container.GetContainerItemID(bag, slot)
   if not itemID or slotItemID ~= itemID then
     return nil, ("bag %d slot %d holds item %s, the tooltip shows %s"):format(bag, slot, tostring(slotItemID),
-      tostring(itemID))
+      tostring(itemID)), true
   end
   if not VS.Disenchant.GetMaterials(link) then
     return nil, "the disenchant table says it can't be disenchanted"
@@ -214,11 +215,11 @@ local function OnItemTooltip(tooltip)
     return
   end
   local link = DisplayedLink(tooltip)
-  local bag, slot = Target(owner, link)
+  local bag, slot, problem = Target(owner, link)
   if not bag then
-    -- slot = why not; traced once per item and reason (tooltips refresh several times a second)
+    -- slot = why not; problems are traced once per item and reason (tooltips refresh several times a second)
     local trace = tostring(link) .. tostring(slot)
-    if trace ~= lastTrace then
+    if problem and trace ~= lastTrace then
       lastTrace = trace
       VS.Debug("alt+click: no hint for %s: %s", tostring(link), tostring(slot))
     end
